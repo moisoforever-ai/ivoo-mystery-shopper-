@@ -1,0 +1,6 @@
+{
+  "name": "IVOO Mystery Shopper — Informe Consolidado",
+  "description": "Informe consolidado y analítico de auditorías Mystery Shopper en retail de tecnología (Daka, Damasco, Multimax, IVOO), con ranking, comparativas por 9 criterios, transcripciones verbatim verificadas con audio real e IA Gemini, notas de voz y sincronización con Google Drive.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
