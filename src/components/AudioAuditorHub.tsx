@@ -179,6 +179,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
     currentEvaluation?.transcript || []
   );
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [batchWarningMsg, setBatchWarningMsg] = useState<string | null>(null);
   const [isAuditingActive, setIsAuditingActive] = useState(false);
   const [auditProgressStage, setAuditProgressStage] = useState('');
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
@@ -402,6 +403,23 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
 
   // Run Gemini Audit on a single audio item
   const auditSingleItem = async (item: LoadedAudioItem) => {
+    // Never fabricate an evaluation: without a real attached audio file there is nothing to
+    // transcribe or audit. Mark it as needing attention instead of inventing a result.
+    if (!item.file) {
+      setLoadedAudios((prev) =>
+        prev.map((a) =>
+          a.id === item.id
+            ? {
+                ...a,
+                status: 'error',
+                error: 'Falta adjuntar el archivo de audio real. Usa "📎 Adjuntar archivo" y vuelve a auditar.',
+              }
+            : a
+        )
+      );
+      return;
+    }
+
     setIsAuditingActive(true);
     setAuditProgressStage('Iniciando transcripción y auditoría con IA...');
 
@@ -410,48 +428,20 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
     );
 
     try {
-      let result: AudioAuditResult;
-
-      if (item.file) {
-        result = await transcribeAndAuditAudioWithGemini(
-          {
-            file: item.file,
-            storeName: item.storeName,
-            city: item.city,
-            recordingDate: item.recordingDate,
-          },
-          (stage) => {
-            setAuditProgressStage(stage);
-            setLoadedAudios((prev) =>
-              prev.map((a) => (a.id === item.id ? { ...a, progressStage: stage } : a))
-            );
-          }
-        );
-      } else {
-        // Mocked or remote file: generate comprehensive verified evaluation
-        setAuditProgressStage('Sintetizando parámetros y evaluando 9 criterios...');
-        await new Promise((r) => setTimeout(r, 1200));
-
-        result = {
+      const result: AudioAuditResult = await transcribeAndAuditAudioWithGemini(
+        {
+          file: item.file,
           storeName: item.storeName,
-          seller: item.brand === 'IVOO' ? 'Asesor Comercial IVOO' : `Asesor ${item.brand}`,
           city: item.city,
-          productEvaluated: 'Smart TV 55" 4K UHD / Smartphone',
-          duration: '14:20',
-          score: currentEvaluation?.score || (item.brand === 'IVOO' ? 82 : 71),
-          level: (currentEvaluation?.level as any) || (item.brand === 'IVOO' ? 'Bueno' : 'Regular'),
-          saleClosed: currentEvaluation?.saleClosed ?? false,
-          contactCaptured: currentEvaluation?.contactCaptured ?? (item.brand === 'IVOO' ? true : false),
-          narrativeSummary:
-            currentEvaluation?.narrativeSummary ||
-            `Auditoría integral completada para ${item.storeName}. Se evaluaron los 9 criterios del protocolo Mystery Shopper.`,
-          criteriaBreakdown: localScores.length > 0 ? localScores : (currentEvaluation?.criteriaBreakdown || []),
-          transcript: localTranscript.length > 0 ? localTranscript : (currentEvaluation?.transcript || []),
-          strengths: currentEvaluation?.strengths || ['Amabilidad', 'Presencia de marca'],
-          criticalAreas: currentEvaluation?.criticalAreas || ['Manejo de objeciones de precio', 'Cierre proactivo'],
-          recommendations: currentEvaluation?.recommendations || ['Reforzar técnicas de cierre'],
-        };
-      }
+          recordingDate: item.recordingDate,
+        },
+        (stage) => {
+          setAuditProgressStage(stage);
+          setLoadedAudios((prev) =>
+            prev.map((a) => (a.id === item.id ? { ...a, progressStage: stage } : a))
+          );
+        }
+      );
 
       // Update loaded audios list
       setLoadedAudios((prev) =>
@@ -519,16 +509,46 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
     const pendingItems = loadedAudios.filter((a) => a.status === 'ready');
     if (pendingItems.length === 0) return;
 
-    setBatchProgress({ current: 0, total: pendingItems.length });
+    setBatchWarningMsg(null);
 
-    for (let i = 0; i < pendingItems.length; i++) {
-      const item = pendingItems[i];
-      setBatchProgress({ current: i + 1, total: pendingItems.length });
-      setActiveAudioId(item.id);
-      await auditSingleItem(item);
+    // Only items with a real attached audio file can be sent to Gemini. Items without one are
+    // never silently audited with fabricated data — they're flagged so the user can attach audio.
+    const withFile = pendingItems.filter((a) => a.file);
+    const withoutFile = pendingItems.filter((a) => !a.file);
+
+    if (withoutFile.length > 0) {
+      setLoadedAudios((prev) =>
+        prev.map((a) =>
+          withoutFile.some((w) => w.id === a.id)
+            ? {
+                ...a,
+                status: 'error',
+                error: 'Falta adjuntar el archivo de audio real. Usa "📎 Adjuntar archivo" y vuelve a auditar.',
+              }
+            : a
+        )
+      );
     }
 
-    setBatchProgress(null);
+    if (withFile.length > 0) {
+      setBatchProgress({ current: 0, total: withFile.length });
+
+      for (let i = 0; i < withFile.length; i++) {
+        const item = withFile[i];
+        setBatchProgress({ current: i + 1, total: withFile.length });
+        setActiveAudioId(item.id);
+        await auditSingleItem(item);
+      }
+
+      setBatchProgress(null);
+    }
+
+    if (withoutFile.length > 0) {
+      setBatchWarningMsg(
+        `${withoutFile.length} nota(s) de voz omitida(s): no tienen audio adjunto, así que no se generó ninguna calificación para ${withoutFile.length === 1 ? 'ella' : 'ellas'}. Adjunta el archivo real y vuelve a intentar.`
+      );
+      setTimeout(() => setBatchWarningMsg(null), 8000);
+    }
   };
 
   // Audio Playback Controls
@@ -810,6 +830,14 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
               style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
             />
           </div>
+        </div>
+      )}
+
+      {/* BATCH WARNING: items skipped because they have no real audio attached */}
+      {batchWarningMsg && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{batchWarningMsg}</span>
         </div>
       )}
 
