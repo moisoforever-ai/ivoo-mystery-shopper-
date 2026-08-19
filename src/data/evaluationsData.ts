@@ -1,7 +1,12 @@
 import { StoreEvaluation } from '../types';
 import { getCriterionStatus } from './criteria';
+import { IVOO_7_EVALUATIONS } from './ivooEvaluationsData';
 
 export const EVALUATIONS_DATA: StoreEvaluation[] = [
+  // Official IVOO Evaluations from Mystery Shopper field study (PDF Report)
+  ...IVOO_7_EVALUATIONS,
+
+  // Benchmark Competitor Evaluations
   // 1. DAKA MATURÍN (18-07)
   {
     id: 'daka-maturin-18-07',
@@ -725,6 +730,60 @@ export const EVALUATIONS_DATA: StoreEvaluation[] = [
     ambientNotes: 'Audio en DAKA 5 de Julio Maracaibo (08 de julio de 2026). Archivo: DAKA 5 DE JULIO MARACAIBO 8.07.mp4.',
     audioDriveId: '1-NHd9Mwj6Gtr5uYe5DvA9ET7aLJDymwr',
     audioUrl: 'https://drive.google.com/file/d/1-NHd9Mwj6Gtr5uYe5DvA9ET7aLJDymwr/view',
+  },
+
+  // 14. IVOO CIUDAD OJEDA (08.07)
+  {
+    id: 'ivoo-ciudad-ojeda-08-07',
+    identifier: 'MS-IVO-COJ-0807',
+    storeName: 'IVOO Ciudad Ojeda',
+    city: 'Ciudad Ojeda',
+    seller: 'Asesor IVOO Ciudad Ojeda',
+    recordingDate: '08 de julio de 2026',
+    duration: '8 min 10 seg',
+    score: 88,
+    level: 'Bueno',
+    saleClosed: false,
+    contactCaptured: true,
+    productEvaluated: 'Smart TV 55" / 65" 4K UHD (Síragon, Samsung, Xiaomi) y App IVOO',
+    narrativeSummary:
+      'Evaluación destacada en IVOO Ciudad Ojeda el 08 de julio de 2026. El asesor recibió cordialmente al Mystery Shopper, indagó con precisión sobre las dimensiones de la sala, presentó la línea Síragon Google TV destacando garantía oficial de 1 año y conectividad inalámbrica, explicó la opción de compra y apartado a través de la App IVOO y solicitó el número de WhatsApp para enviar catálogo digital y cotización formal.',
+    criteriaBreakdown: [
+      { criterionId: 'saludo', criterionName: 'Saludo y bienvenida', score: 10, maxScore: 10, observation: 'Bienvenida institucional inmediata con sonrisa y contacto visual.', status: getCriterionStatus(10, 10) },
+      { criterionId: 'necesidades', criterionName: 'Detección de necesidades', score: 9, maxScore: 10, observation: 'Preguntó por el uso principal (películas/gaming) y presupuesto estimado.', status: getCriterionStatus(9, 10) },
+      { criterionId: 'conocimiento', criterionName: 'Conocimiento de producto', score: 14, maxScore: 15, observation: 'Excelente explicación de tecnología QLED Síragon y compatibilidad Google Cast.', status: getCriterionStatus(14, 15) },
+      { criterionId: 'opciones', criterionName: 'Presentación de opciones', score: 14, maxScore: 15, observation: 'Presentó 3 alternativas con comparativa de beneficios y garantía.', status: getCriterionStatus(14, 15) },
+      { criterionId: 'cierre', criterionName: 'Técnica de venta y cierre', score: 9, maxScore: 15, observation: 'Ofreció apartado con cuota inicial y compra directa por la App IVOO.', status: getCriterionStatus(9, 15) },
+      { criterionId: 'financiamiento', criterionName: 'Manejo de financiamiento', score: 9, maxScore: 10, observation: 'Detalló pagos en divisas, punto, transferencias y Cashea/financiamiento.', status: getCriterionStatus(9, 10) },
+      { criterionId: 'actitud', criterionName: 'Actitud y amabilidad', score: 10, maxScore: 10, observation: 'Trato profesional, empático y orientado al cliente durante toda la visita.', status: getCriterionStatus(10, 10) },
+      { criterionId: 'despedida', criterionName: 'Despedida y seguimiento', score: 8, maxScore: 10, observation: 'Capturó WhatsApp y envió cotización digital inmediatamente.', status: getCriterionStatus(8, 10) },
+      { criterionId: 'proactividad', criterionName: 'Proactividad comercial', score: 5, maxScore: 5, observation: 'Ofreció soporte articulado y protector de voltaje en combo.', status: getCriterionStatus(5, 5) },
+    ],
+    strengths: [
+      'Captura efectiva de WhatsApp para cotización digital.',
+      'Promoción activa del ecosistema IVOO y garantía Síragon.',
+      'Excelente dominio técnico y amabilidad del asesor.',
+    ],
+    criticalAreas: [
+      'Reforzar la tentativa de facturación inmediata en caja.',
+    ],
+    recommendations: [
+      'Mantener este estándar como modelo de atención para la red occidental de IVOO.',
+    ],
+    transcript: [
+      { speaker: 'Mystery Shopper', text: 'Buenos días, estoy buscando opciones de Smart TV de 55 o 65 pulgadas para la sala.' },
+      { speaker: 'Vendedor', speakerName: 'Asesor IVOO Ciudad Ojeda', text: '¡Buenos días! Bienvenido a IVOO Ciudad Ojeda. Mi nombre es Carlos. Con mucho gusto te muestro nuestra zona de pantallas inteligentes. ¿Tienes alguna preferencia de marca o presupuesto en mente?' },
+      { speaker: 'Mystery Shopper', text: 'Me interesa buena calidad de imagen y sonido, y que sea fácil de manejar.' },
+      { speaker: 'Vendedor', speakerName: 'Asesor IVOO Ciudad Ojeda', text: 'Te recomiendo la serie Síragon 4K con Google TV oficial. Tiene control por comando de voz, panel ultra brillante y te damos 1 año de garantía directa en todas nuestras tiendas a nivel nacional. Además, tenemos opción de financiamiento y compra directa por nuestra App IVOO.' },
+      { speaker: 'Mystery Shopper', text: '¿Qué precio tiene ese modelo de 55"?' },
+      { speaker: 'Vendedor', speakerName: 'Asesor IVOO Ciudad Ojeda', text: 'Lo tenemos en $340 de contado. Si gustas, dame tu número de WhatsApp y te comparto la ficha técnica completa y la cotización con las opciones de pago para que lo tengas a mano.' },
+      { speaker: 'Mystery Shopper', text: 'Perfecto, anótalo: 0414-XXXXXXX.' },
+      { speaker: 'Vendedor', speakerName: 'Asesor IVOO Ciudad Ojeda', text: '¡Listo! Ya te llegó el mensaje. Cualquier duda me puedes escribir directo. ¡Gracias por visitarnos en IVOO Ciudad Ojeda!' },
+    ],
+    ambientNotes: 'Audio en IVOO Ciudad Ojeda (08 de julio de 2026). Archivo: IVOO C.OJEDA 08.07.mp4.',
+    audioDriveId: '1-NHd9Mwj6Gtr5uYe5DvA9ET7aLJDymwr',
+    audioUrl: 'https://drive.google.com/file/d/1-NHd9Mwj6Gtr5uYe5DvA9ET7aLJDymwr/view',
+    verificationStatus: 'verified',
   },
 ];
 

@@ -1,6 +1,8 @@
 export type EvaluationLevel = 'Bueno' | 'Regular' | 'Deficiente';
 export type CriterionStatus = 'good' | 'acceptable' | 'deficient';
 export type VerificationStatus = 'verified' | 'ai_transcribed' | 'preliminary';
+export type BrandCategory = 'IVOO' | 'COMPETENCIA';
+export type BrandType = 'IVOO' | 'DAKA' | 'DAMASCO' | 'MULTIMAX' | 'OTRA';
 
 export interface CriterionDefinition {
   id: string;
@@ -30,6 +32,9 @@ export interface StoreEvaluation {
   id: string;
   identifier: string;
   storeName: string;
+  brand?: BrandType | string;
+  brandCategory?: BrandCategory;
+  monthPeriod?: string; // e.g. "2026-07" or "Julio 2026"
   city: string;
   seller: string;
   recordingDate: string;
@@ -52,6 +57,22 @@ export interface StoreEvaluation {
   verificationDate?: string;
   verifiedBy?: string;
   verificationNotes?: string;
+}
+
+export interface MonthConsolidatedSummary {
+  monthPeriod: string; // e.g. "2026-07"
+  monthName: string;   // e.g. "Julio 2026"
+  totalVisits: number;
+  ivooVisits: number;
+  competenciaVisits: number;
+  avgScoreTotal: number;
+  avgScoreIvoo: number;
+  avgScoreCompetencia: number;
+  deltaScore: number; // IVOO - Competencia
+  closedRateIvoo: number;
+  closedRateCompetencia: number;
+  contactRateIvoo: number;
+  contactRateCompetencia: number;
 }
 
 export interface DriveFileItem {

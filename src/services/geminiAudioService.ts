@@ -95,22 +95,54 @@ function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   return new Blob([wavBuffer], { type: 'audio/wav' });
 }
 
+export function detectAudioMimeType(file: File | Blob, filename?: string): string {
+  const name = (file instanceof File ? file.name : '') || filename || '';
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+
+  if (ext === 'm4a' || ext === 'mp4') return 'audio/mp4';
+  if (ext === 'mp3') return 'audio/mp3';
+  if (ext === 'wav') return 'audio/wav';
+  if (ext === 'ogg' || ext === 'opus') return 'audio/ogg';
+  if (ext === 'aac') return 'audio/aac';
+  if (ext === 'webm') return 'audio/webm';
+  if (ext === 'flac') return 'audio/flac';
+
+  if (file.type && file.type.startsWith('audio/')) {
+    if (file.type.includes('m4a') || file.type.includes('mp4')) return 'audio/mp4';
+    if (file.type.includes('wav')) return 'audio/wav';
+    if (file.type.includes('mpeg') || file.type.includes('mp3')) return 'audio/mp3';
+    if (file.type.includes('ogg') || file.type.includes('opus')) return 'audio/ogg';
+    if (file.type.includes('aac')) return 'audio/aac';
+    if (file.type.includes('webm')) return 'audio/webm';
+    return file.type;
+  }
+
+  return 'audio/mp4';
+}
+
 /**
- * Optimizes audio for Gemini AI speech analysis (Resamples to 16kHz mono WAV)
+ * Optimizes audio for Gemini AI speech analysis
  */
-async function optimizeAudioForSpeech(file: File | Blob): Promise<{ blob: Blob; mimeType: string }> {
+async function prepareAudioBlob(file: File | Blob): Promise<{ blob: Blob; mimeType: string }> {
+  const mimeType = detectAudioMimeType(file);
+
+  // If the file is already a compressed standard audio under 40MB, pass it directly
+  if (file.size < 40 * 1024 * 1024) {
+    return { blob: file, mimeType };
+  }
+
+  // If the file is massive raw PCM WAV (>40MB), resample to 16kHz mono WAV to reduce transfer size
   try {
     const arrayBuffer = await file.arrayBuffer();
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) {
-      return { blob: file, mimeType: file.type || 'audio/mp4' };
+      return { blob: file, mimeType };
     }
 
     const audioCtx = new AudioContextClass();
     const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
     await audioCtx.close();
 
-    // Target sample rate for speech is 16,000 Hz
     const targetSampleRate = 16000;
     const targetLength = Math.ceil(decodedBuffer.duration * targetSampleRate);
 
@@ -125,8 +157,8 @@ async function optimizeAudioForSpeech(file: File | Blob): Promise<{ blob: Blob; 
 
     return { blob: wavBlob, mimeType: 'audio/wav' };
   } catch (err) {
-    console.warn('Audio downsampling fallback (using raw file):', err);
-    return { blob: file, mimeType: file.type || 'audio/mp4' };
+    console.warn('Direct audio passthrough (resampling skipped):', err);
+    return { blob: file, mimeType };
   }
 }
 
@@ -226,10 +258,10 @@ export async function transcribeAndAuditAudioWithGemini(
   let targetMimeType = params.mimeType || 'audio/mp4';
 
   if (params.file) {
-    onProgress?.('Optimizando audio para análisis de voz...');
-    const optimized = await optimizeAudioForSpeech(params.file);
-    targetBlob = optimized.blob;
-    targetMimeType = optimized.mimeType;
+    onProgress?.('Preparando archivo de audio para análisis de voz...');
+    const prepared = await prepareAudioBlob(params.file);
+    targetBlob = prepared.blob;
+    targetMimeType = prepared.mimeType;
   } else if (params.audioBase64) {
     // If provided as base64 string, convert to blob to chunk it safely
     const cleanBase64 = params.audioBase64.includes(',')

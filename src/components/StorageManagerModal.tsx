@@ -7,6 +7,7 @@ import {
   StorageStats,
 } from '../services/storageManager';
 import { StoreEvaluation } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 import {
   HardDrive,
   Trash2,
@@ -33,6 +34,20 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
 }) => {
   const [stats, setStats] = useState<StorageStats>(getStorageStats());
   const [message, setMessage] = useState<{ type: 'success' | 'info' | 'warn'; text: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    icon?: 'trash' | 'warning' | 'restore';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const handleManualPurge = () => {
     const result = autoPurgeStorage(true);
@@ -52,19 +67,44 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
   };
 
   const handleResetFactory = () => {
-    if (
-      window.confirm(
-        '¿Estás seguro de restablecer los datos a los valores originales de fábrica? Se revertirán las modificaciones no respaldadas.'
-      )
-    ) {
-      const reset = resetToFactoryData();
-      onResetData(reset);
-      setStats(getStorageStats());
-      setMessage({
-        type: 'info',
-        text: 'Datos restablecidos a los valores originales de auditoría de mayo 2026.',
-      });
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Restablecer Fichas Oficiales',
+      message:
+        '¿Estás seguro de restablecer los datos a los valores originales de fábrica? Se recargarán las 7 evaluaciones oficiales de IVOO.',
+      confirmText: 'Restablecer',
+      variant: 'primary',
+      icon: 'restore',
+      onConfirm: () => {
+        const reset = resetToFactoryData();
+        onResetData(reset);
+        setStats(getStorageStats());
+        setMessage({
+          type: 'info',
+          text: 'Datos restablecidos a los valores oficiales de auditoría de IVOO.',
+        });
+      },
+    });
+  };
+
+  const handleStartBlank = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Iniciar Reporte en Blanco',
+      message:
+        '¿Deseas iniciar un reporte nuevo en blanco? Se vaciarán las evaluaciones viejas para que puedas cargar tus nuevas notas de voz sin mezclarlas. (Podrás restaurar los datos oficiales en cualquier momento).',
+      confirmText: 'Sí, Vaciar Todo',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: () => {
+        onResetData([]);
+        setStats(getStorageStats());
+        setMessage({
+          type: 'success',
+          text: 'Se ha creado un reporte en blanco. Ahora puedes subir o auditar tus nuevos audios.',
+        });
+      },
+    });
   };
 
   return (
@@ -172,11 +212,19 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
             </button>
 
             <button
+              onClick={handleStartBlank}
+              className="w-full py-2.5 px-4 bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Iniciar Nuevo Reporte en Blanco (Vaciar Anteriores)</span>
+            </button>
+
+            <button
               onClick={handleResetFactory}
-              className="w-full py-2 px-4 text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full py-2 px-4 text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Restablecer Evaluaciones a Valores Originales</span>
+              <span>Restablecer Fichas Oficiales (7 Tiendas IVOO)</span>
             </button>
           </div>
         </div>
@@ -191,6 +239,18 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* In-app Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        icon={confirmDialog.icon}
+        onConfirm={confirmDialog.onConfirm}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

@@ -31,13 +31,16 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 
 interface EvaluacionesIndividualesViewProps {
   evaluations: StoreEvaluation[];
   selectedStoreId: string;
   onSelectStore: (storeId: string) => void;
   onUpdateEvaluation: (updated: StoreEvaluation) => void;
+  onDeleteEvaluation?: (storeId: string) => void;
   onGoToAudios?: (storeId: string) => void;
 }
 
@@ -46,6 +49,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
   selectedStoreId,
   onSelectStore,
   onUpdateEvaluation,
+  onDeleteEvaluation,
   onGoToAudios,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,6 +57,20 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
   const [isEditing, setIsEditing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isReauditing, setIsReauditing] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    icon?: 'trash' | 'warning' | 'restore';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   const [copiedTranscript, setCopiedTranscript] = useState(false);
 
   const getGoogleDriveId = (url?: string, driveId?: string): string | null => {
@@ -257,11 +275,33 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsEditing(true)}
-              className="text-xs font-bold bg-lime-400 text-slate-950 px-3 py-1.5 rounded-lg hover:bg-lime-300 transition-colors flex items-center gap-1.5 shadow-xs"
+              className="text-xs font-bold bg-lime-400 text-slate-950 px-3 py-1.5 rounded-lg hover:bg-lime-300 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Editar Fecha y Audio</span>
+              <span>Editar</span>
             </button>
+
+            {onDeleteEvaluation && (
+              <button
+                onClick={() => {
+                  setConfirmDialog({
+                    isOpen: true,
+                    title: 'Eliminar Evaluación',
+                    message: `¿Estás seguro de eliminar la evaluación de "${currentEval.storeName}" del reporte comparativo?`,
+                    confirmText: 'Sí, Eliminar',
+                    variant: 'danger',
+                    icon: 'trash',
+                    onConfirm: () => onDeleteEvaluation(currentEval.id),
+                  });
+                }}
+                className="text-xs font-bold bg-slate-800 text-rose-300 hover:bg-rose-950/80 hover:text-rose-200 border border-slate-700 hover:border-rose-700/50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                title="Eliminar esta evaluación del reporte"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Eliminar</span>
+              </button>
+            )}
+
             <div className="text-xs font-mono text-lime-400 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
               {currentEval.identifier}
             </div>
@@ -694,6 +734,18 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
           <span className="font-semibold">{toastMessage}</span>
         </div>
       )}
+
+      {/* In-app Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        icon={confirmDialog.icon}
+        onConfirm={confirmDialog.onConfirm}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

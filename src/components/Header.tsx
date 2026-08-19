@@ -9,13 +9,14 @@ import {
   HardDrive,
   FileAudio,
   Sparkles,
+  Radio,
 } from 'lucide-react';
 import { StorageManagerModal } from './StorageManagerModal';
 import { StoreEvaluation } from '../types';
 
 interface HeaderProps {
-  activeTab: 'portada' | 'resumen' | 'evaluaciones' | 'audios' | 'drive';
-  setActiveTab: (tab: 'portada' | 'resumen' | 'evaluaciones' | 'audios' | 'drive') => void;
+  activeTab: 'audios' | 'resumen' | 'evaluaciones';
+  setActiveTab: (tab: 'audios' | 'resumen' | 'evaluaciones') => void;
   onPrint: () => void;
   evaluations?: StoreEvaluation[];
   onResetEvaluations?: (evals: StoreEvaluation[]) => void;
@@ -37,51 +38,59 @@ export const Header: React.FC<HeaderProps> = ({
   ).length;
 
   return (
-    <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-2">
           {/* Logo & Branding */}
           <div
-            className="flex items-center space-x-3 cursor-pointer"
-            onClick={() => setActiveTab('portada')}
+            className="flex items-center space-x-2.5 cursor-pointer shrink-0 py-1"
+            onClick={() => setActiveTab('audios')}
+            title="Ir a Centro de Audios"
           >
-            <div className="bg-lime-400 text-slate-950 font-black tracking-widest text-xl px-2.5 py-1 rounded font-mono shadow-xs">
+            <div className="bg-lime-400 text-slate-950 font-black tracking-widest text-lg sm:text-xl px-2.5 py-0.5 rounded font-mono shadow-xs">
               IVOO
             </div>
             <div>
-              <div className="text-sm font-semibold tracking-wide text-slate-100 flex items-center gap-1.5">
+              <div className="text-xs sm:text-sm font-black tracking-tight text-white flex items-center gap-1.5">
                 <span>Mystery Shopper</span>
-                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-lime-400 font-mono font-normal">
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-lime-400 font-mono font-bold border border-slate-700">
                   Julio 2026
                 </span>
               </div>
-              <p className="text-xs text-slate-400 hidden sm:block">
-                Informe Consolidado • {evaluations.length} Evaluaciones Benchmark
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                Auditoría Comercial & Benchmark Retail
               </p>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center space-x-1 sm:space-x-2">
+          {/* Clean 3-Tab Main Navigation */}
+          <nav className="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto py-1 scrollbar-none">
+            {/* Primary Tab: Audios & AI Hub */}
             <button
-              id="nav-tab-portada"
-              onClick={() => setActiveTab('portada')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'portada'
-                  ? 'bg-slate-800 text-lime-400 border-b-2 border-lime-400 font-bold'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              id="nav-tab-audios"
+              onClick={() => setActiveTab('audios')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                activeTab === 'audios'
+                  ? 'bg-lime-400 text-slate-950 shadow-md ring-2 ring-lime-400/50'
+                  : 'bg-slate-900 text-lime-400 hover:bg-slate-800 border border-lime-400/30'
               }`}
             >
-              <FileText className="w-4 h-4" />
-              <span className="hidden md:inline">Portada</span>
+              <Radio className="w-4 h-4" />
+              <span>Audios & IA</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${
+                activeTab === 'audios' ? 'bg-slate-950 text-lime-400' : 'bg-lime-400/20 text-lime-300'
+              }`}>
+                Auto-Auditoría
+              </span>
             </button>
 
+            {/* Second Tab: Comparative Summary */}
             <button
               id="nav-tab-resumen"
               onClick={() => setActiveTab('resumen')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'resumen'
-                  ? 'bg-slate-800 text-lime-400 border-b-2 border-lime-400 font-bold'
+                  ? 'bg-slate-800 text-lime-400 border border-lime-400/40 shadow-xs'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
@@ -89,67 +98,39 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Resumen Comparativo</span>
             </button>
 
+            {/* Third Tab: Individual Store Evaluations */}
             <button
               id="nav-tab-evaluaciones"
               onClick={() => setActiveTab('evaluaciones')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'evaluaciones'
-                  ? 'bg-slate-800 text-lime-400 border-b-2 border-lime-400 font-bold'
+                  ? 'bg-slate-800 text-lime-400 border border-lime-400/40 shadow-xs'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <ListOrdered className="w-4 h-4" />
-              <span>Evaluaciones ({evaluations.length})</span>
-            </button>
-
-            <button
-              id="nav-tab-drive"
-              onClick={() => setActiveTab('drive')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer ${
-                activeTab === 'drive'
-                  ? 'bg-slate-800 text-lime-400 border-b-2 border-lime-400 font-bold'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <FolderSync className="w-4 h-4 text-lime-400" />
-              <span className="font-bold">⚡ Automatización Drive & IA</span>
-              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-lime-400/20 text-lime-300 border border-lime-400/30">
-                {verifiedCount}/{evaluations.length}
-              </span>
-            </button>
-
-            <button
-              id="nav-tab-audios"
-              onClick={() => setActiveTab('audios')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors cursor-pointer text-slate-400 hover:text-slate-200 ${
-                activeTab === 'audios'
-                  ? 'bg-slate-800 text-slate-200 border-b-2 border-slate-400 font-semibold'
-                  : 'hover:bg-slate-800/60'
-              }`}
-            >
-              <FileAudio className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline text-xs">Visor Manual</span>
+              <span>Fichas de Tienda ({evaluations.length})</span>
             </button>
           </nav>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          {/* Action Buttons Right */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setIsStorageModalOpen(true)}
               title="Gestión de Memoria y Auto-depuración"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
             >
               <HardDrive className="w-3.5 h-3.5 text-lime-400" />
-              <span className="hidden xl:inline">Memoria / Auto-Depuración</span>
+              <span className="hidden xl:inline">Memoria</span>
             </button>
 
             <button
               id="btn-print-report"
               onClick={onPrint}
               title="Imprimir o exportar a PDF"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs sm:text-sm font-black transition-all shadow-xs cursor-pointer hover:scale-102"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-black transition-all shadow-xs cursor-pointer hover:scale-102"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Imprimir / PDF</span>
             </button>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { EVALUATIONS_DATA } from '../data/evaluationsData';
-import { StoreEvaluation } from '../types';
+import { StoreEvaluation, BrandCategory } from '../types';
 import {
   IVOO_CRITERIA,
   getCriterionStatus,
@@ -8,12 +8,23 @@ import {
   getLevelBadgeClasses,
 } from '../data/criteria';
 import {
+  getMonthlyConsolidatedSummaries,
+  getComparativeCriteriaMatrix,
+  normalizeEvaluationsList,
+} from '../utils/evaluationHelpers';
+import {
   Trophy,
   BarChart,
   Lightbulb,
   ExternalLink,
   CheckCircle2,
   XCircle,
+  Calendar,
+  Layers,
+  ArrowUpRight,
+  ArrowDownRight,
+  TrendingUp,
+  Building2,
 } from 'lucide-react';
 
 interface ResumenComparativoViewProps {
@@ -25,39 +36,81 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
   evaluations = EVALUATIONS_DATA,
   onSelectStore,
 }) => {
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedBrandCategory, setSelectedBrandCategory] = useState<'all' | 'IVOO' | 'COMPETENCIA'>('all');
   const [highlightedCriterion, setHighlightedCriterion] = useState<string | null>(null);
 
-  // Memoized statistical & mathematical metrics
-  const stats = useMemo(() => {
-    const total = evaluations.length || 1;
-    const overallAvg = evaluations.reduce((sum, e) => sum + (Number(e.score) || 0), 0) / total;
+  // Normalize evaluations
+  const normalizedAll = useMemo(() => normalizeEvaluationsList(evaluations), [evaluations]);
 
-    const closedCount = evaluations.filter((e) => e.saleClosed).length;
+  // Monthly summary cards across entire history
+  const monthlySummaries = useMemo(() => getMonthlyConsolidatedSummaries(normalizedAll), [normalizedAll]);
+
+  // Available months extracted dynamically
+  const availableMonths = useMemo(() => {
+    const months = Array.from(new Set<string>(normalizedAll.map((e) => e.monthPeriod || '2026-07')));
+    return months.sort((a, b) => b.localeCompare(a));
+  }, [normalizedAll]);
+
+  // Filter evaluations based on active selection
+  const filteredEvaluations = useMemo(() => {
+    return normalizedAll.filter((item) => {
+      const matchMonth = selectedMonth === 'all' || item.monthPeriod === selectedMonth;
+      const matchBrand =
+        selectedBrandCategory === 'all' || item.brandCategory === selectedBrandCategory;
+      return matchMonth && matchBrand;
+    });
+  }, [normalizedAll, selectedMonth, selectedBrandCategory]);
+
+  // Comparative Criteria Matrix between IVOO and Competencia for the active month selection
+  const criteriaBenchmark = useMemo(() => {
+    const monthFiltered = selectedMonth === 'all'
+      ? normalizedAll
+      : normalizedAll.filter((i) => i.monthPeriod === selectedMonth);
+    return getComparativeCriteriaMatrix(monthFiltered);
+  }, [normalizedAll, selectedMonth]);
+
+  // Memoized statistical & mathematical metrics for the filtered view
+  const stats = useMemo(() => {
+    const total = filteredEvaluations.length || 1;
+    const overallAvg = filteredEvaluations.reduce((sum, e) => sum + (Number(e.score) || 0), 0) / total;
+
+    const closedCount = filteredEvaluations.filter((e) => e.saleClosed).length;
     const closedPercentage = (closedCount / total) * 100;
 
-    const contactCount = evaluations.filter((e) => e.contactCaptured).length;
+    const contactCount = filteredEvaluations.filter((e) => e.contactCaptured).length;
     const contactPercentage = (contactCount / total) * 100;
 
-    const goodCount = evaluations.filter((e) => e.score >= 75).length;
-    const regularCount = evaluations.filter((e) => e.score >= 50 && e.score < 75).length;
-    const deficientCount = evaluations.filter((e) => e.score < 50).length;
+    const goodCount = filteredEvaluations.filter((e) => e.score >= 75).length;
+    const regularCount = filteredEvaluations.filter((e) => e.score >= 50 && e.score < 75).length;
+    const deficientCount = filteredEvaluations.filter((e) => e.score < 50).length;
     const deficientPercentage = (deficientCount / total) * 100;
 
     const level = overallAvg >= 75 ? 'Bueno' : overallAvg >= 50 ? 'Regular' : 'Deficiente';
 
+    // IVOO vs Competitor breakdown within filtered dataset
+    const ivooItems = filteredEvaluations.filter((e) => e.brandCategory === 'IVOO' || e.brand === 'IVOO');
+    const compItems = filteredEvaluations.filter((e) => e.brandCategory === 'COMPETENCIA' || e.brand !== 'IVOO');
+
+    const ivooAvg = ivooItems.length > 0 ? ivooItems.reduce((acc, i) => acc + (Number(i.score) || 0), 0) / ivooItems.length : 0;
+    const compAvg = compItems.length > 0 ? compItems.reduce((acc, i) => acc + (Number(i.score) || 0), 0) / compItems.length : 0;
+    const deltaScore = ivooAvg - compAvg;
+
     // Unique cities and brands
-    const citiesList = Array.from(new Set(evaluations.map((e) => e.city).filter(Boolean)));
+    const citiesList = Array.from(new Set(filteredEvaluations.map((e) => e.city).filter(Boolean)));
     const citiesText = citiesList.join(', ');
 
-    const brandsList = Array.from(new Set(evaluations.map((e) => e.storeName.split(' ')[0]).filter(Boolean)));
+    const brandsList = Array.from(new Set(filteredEvaluations.map((e) => e.brand || e.storeName.split(' ')[0]).filter(Boolean)));
     const brandsText = brandsList.join(' / ');
 
-    const dates = Array.from(new Set(evaluations.map((e) => e.recordingDate).filter(Boolean)));
-    const periodText = dates.some((d) => d.toLowerCase().includes('julio')) ? 'Julio de 2026' : dates[0] || '2026';
+    const dates = Array.from(new Set(filteredEvaluations.map((e) => e.recordingDate).filter(Boolean)));
+    const periodText = selectedMonth === 'all'
+      ? 'Histórico Consolidado'
+      : (monthlySummaries.find((m) => m.monthPeriod === selectedMonth)?.monthName || dates[0] || '2026');
 
-    // Criteria averages across all evaluated stores
+    // Criteria averages across all evaluated stores in active filter
     const criteriaAverages = IVOO_CRITERIA.map((criterion) => {
-      const totalScore = evaluations.reduce((sum, item) => {
+      const totalScore = filteredEvaluations.reduce((sum, item) => {
         const found = item.criteriaBreakdown?.find((c) => c.criterionId === criterion.id);
         return sum + (found ? Number(found.score) || 0 : 0);
       }, 0);
@@ -77,7 +130,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
     const strongestCriteria = [...criteriaAverages].sort((a, b) => b.percentage - a.percentage).slice(0, 3);
 
     // Sorted evaluations by performance descending
-    const sortedEvaluations = [...evaluations].sort((a, b) => b.score - a.score);
+    const sortedEvaluations = [...filteredEvaluations].sort((a, b) => b.score - a.score);
     const topEvaluation = sortedEvaluations[0];
     const bottomEvaluation = sortedEvaluations[sortedEvaluations.length - 1];
 
@@ -93,6 +146,11 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
       regularCount,
       deficientCount,
       deficientPercentage,
+      ivooItems,
+      compItems,
+      ivooAvg,
+      compAvg,
+      deltaScore,
       citiesList,
       citiesText,
       brandsText,
@@ -104,28 +162,341 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
       topEvaluation,
       bottomEvaluation,
     };
-  }, [evaluations]);
+  }, [filteredEvaluations, selectedMonth, monthlySummaries]);
+
+  const getBrandBadge = (brandName?: string, category?: BrandCategory) => {
+    const b = (brandName || '').toUpperCase();
+    if (b.includes('IVOO') || category === 'IVOO') {
+      return (
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-black bg-lime-400 text-slate-950 border border-lime-500 shadow-xs">
+          IVOO
+        </span>
+      );
+    }
+    if (b.includes('DAKA')) {
+      return (
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-100 text-blue-800 border border-blue-300">
+          DAKA
+        </span>
+      );
+    }
+    if (b.includes('DAMASCO')) {
+      return (
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300">
+          DAMASCO
+        </span>
+      );
+    }
+    if (b.includes('MULTIMAX')) {
+      return (
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-100 text-purple-800 border border-purple-300">
+          MULTIMAX
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-100 text-slate-700 border border-slate-300">
+        COMPETENCIA
+      </span>
+    );
+  };
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-10">
-      {/* 1. Context Intro */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-          <BarChart className="w-4 h-4 text-lime-600" />
-          <span>Análisis Ejecutivo Consolidado</span>
+      {/* 1. Interactive Consolidation & Filtering Controls */}
+      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 text-lime-400 font-mono text-xs uppercase font-bold tracking-wider mb-1">
+            <Calendar className="w-4 h-4" />
+            <span>Consolidado Mensual & Segmentación de Base de Datos</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-white">
+            Panel de Control y Registro Histórico
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+            Analiza evaluaciones por período mensual y contrasta el desempeño de IVOO frente a competidores directos.
+          </p>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Resumen Comparativo — {stats.total} Visitas de Evaluación ({stats.periodText})
-        </h2>
-        <p className="mt-3 text-slate-600 leading-relaxed text-sm sm:text-base">
-          Durante la ronda de auditoría comercial Mystery Shopper correspondiente a <strong>{stats.periodText}</strong>, se completaron <strong>{stats.total} evaluaciones presenciales</strong> en tiendas {stats.brandsText} ubicadas en las plazas de <strong>{stats.citiesText}</strong>. La metodología estandarizada evaluó <strong>9 criterios cuantitativos sobre 100 puntos</strong>. El resultado global arroja un promedio de <strong>{stats.overallAvg.toFixed(1)}/100 (Nivel {stats.level})</strong>, con una tasa de cierre de venta del <strong>{stats.closedPercentage.toFixed(1)}%</strong> ({stats.closedCount} de {stats.total} visitas) y una captura de datos de contacto del <strong>{stats.contactPercentage.toFixed(1)}%</strong> ({stats.contactCount} de {stats.total} visitas).
-        </p>
+
+        {/* Filters Selectors */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Month Selector */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Mes / Período:
+            </label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-800 border border-slate-700 text-white text-xs font-semibold rounded-lg px-3 py-2 focus:ring-2 focus:ring-lime-400 focus:outline-hidden cursor-pointer"
+            >
+              <option value="all">🌟 Todos los Meses ({normalizedAll.length} visitas)</option>
+              {availableMonths.map((m) => {
+                const summary = monthlySummaries.find((s) => s.monthPeriod === m);
+                return (
+                  <option key={m} value={m}>
+                    📅 {summary?.monthName || m} ({summary?.totalVisits || 0} visitas)
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Brand Category Filter */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Segmento de Red:
+            </label>
+            <div className="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700">
+              <button
+                type="button"
+                onClick={() => setSelectedBrandCategory('all')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                  selectedBrandCategory === 'all'
+                    ? 'bg-slate-700 text-lime-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedBrandCategory('IVOO')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                  selectedBrandCategory === 'IVOO'
+                    ? 'bg-lime-400 text-slate-950 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Solo IVOO
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedBrandCategory('COMPETENCIA')}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                  selectedBrandCategory === 'COMPETENCIA'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Competencia
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 2. Key Metrics Banner */}
+      {/* 2. Monthly Registry Table (Registro por Mes de Consolidados) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-lime-600" />
+              <span>Registro Histórico de Consolidados por Mes</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Evolución cronológica de visitas, puntajes comparativos y brecha diferencial (IVOO vs Competencia)
+            </p>
+          </div>
+          <span className="text-xs font-mono font-bold bg-slate-200 text-slate-800 px-2.5 py-1 rounded-full">
+            {monthlySummaries.length} Período(s) Registrado(s)
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-100/90 text-xs font-bold uppercase text-slate-600 border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4">Mes / Período</th>
+                <th className="py-3 px-3 text-center">Total Visitas</th>
+                <th className="py-3 px-3 text-center">Muestras IVOO</th>
+                <th className="py-3 px-3 text-center">Muestras Competencia</th>
+                <th className="py-3 px-3 text-center bg-slate-100">Promedio General</th>
+                <th className="py-3 px-3 text-center bg-lime-50 text-lime-900">Promedio IVOO</th>
+                <th className="py-3 px-3 text-center bg-blue-50 text-blue-900">Promedio Competencia</th>
+                <th className="py-3 px-3 text-center">Brecha (Delta)</th>
+                <th className="py-3 px-3 text-center">Tasa Cierre</th>
+                <th className="py-3 px-4 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {monthlySummaries.map((m) => {
+                const isSelected = selectedMonth === m.monthPeriod;
+                return (
+                  <tr
+                    key={m.monthPeriod}
+                    className={`transition-colors ${
+                      isSelected ? 'bg-lime-50/60 font-semibold' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-3 px-4 font-bold text-slate-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-lime-500"></span>
+                      <span>{m.monthName}</span>
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-bold">{m.totalVisits}</td>
+                    <td className="py-3 px-3 text-center font-mono text-lime-700 font-bold">
+                      {m.ivooVisits}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono text-blue-700 font-bold">
+                      {m.competenciaVisits}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-black text-slate-900 bg-slate-50">
+                      {m.avgScoreTotal.toFixed(1)}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-black text-lime-900 bg-lime-50/50">
+                      {m.avgScoreIvoo > 0 ? `${m.avgScoreIvoo.toFixed(1)}` : '—'}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-black text-blue-900 bg-blue-50/50">
+                      {m.avgScoreCompetencia > 0 ? `${m.avgScoreCompetencia.toFixed(1)}` : '—'}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-bold">
+                      {m.avgScoreIvoo > 0 && m.avgScoreCompetencia > 0 ? (
+                        <span
+                          className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-xs ${
+                            m.deltaScore >= 0
+                              ? 'text-emerald-800 bg-emerald-100'
+                              : 'text-rose-800 bg-rose-100'
+                          }`}
+                        >
+                          {m.deltaScore >= 0 ? '+' : ''}
+                          {m.deltaScore.toFixed(1)} pts
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono">
+                      {m.closedRateIvoo.toFixed(0)}% IVOO / {m.closedRateCompetencia.toFixed(0)}% Comp
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={() => setSelectedMonth(m.monthPeriod)}
+                        className={`text-xs font-bold px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-slate-900 text-lime-400'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {isSelected ? 'Activo' : 'Filtrar'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 3. Competitive Benchmark Matrix (IVOO vs Competencia) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <Building2 className="w-4 h-4 text-lime-600" />
+              <span>Benchmark Competitivo • {stats.periodText}</span>
+            </div>
+            <h3 className="text-lg sm:text-xl font-black text-slate-900">
+              Matriz Comparativa de Criterios: IVOO vs Red Competidora
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Cálculo de brecha diferencial (Delta = Promedio IVOO - Promedio Competencia) por cada uno de los 9 criterios comerciales
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs font-bold">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-lime-400 border border-lime-600"></span>
+              <span>IVOO Promedio: <strong>{stats.ivooAvg.toFixed(1)}/100</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+              <span>Competencia Promedio: <strong>{stats.compAvg.toFixed(1)}/100</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-slate-100/80 text-xs font-bold uppercase text-slate-600 border-b border-slate-200">
+              <tr>
+                <th className="py-3.5 px-4">Criterio de Evaluación</th>
+                <th className="py-3.5 px-3 text-center">Puntaje Máx</th>
+                <th className="py-3.5 px-3 text-center bg-lime-50/70 text-lime-900 font-black">
+                  Promedio IVOO
+                </th>
+                <th className="py-3.5 px-3 text-center bg-blue-50/70 text-blue-900 font-black">
+                  Promedio Competencia
+                </th>
+                <th className="py-3.5 px-3 text-center font-bold">Brecha Diferencial (Delta)</th>
+                <th className="py-3.5 px-4 text-center">Liderazgo en Criterio</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {criteriaBenchmark.map((crit) => {
+                const isIvooLead = crit.delta > 0;
+                const isTie = crit.delta === 0;
+
+                return (
+                  <tr key={crit.criterionId} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      {crit.name}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono text-slate-500 font-semibold">
+                      {crit.maxScore} pts
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-black text-lime-950 bg-lime-50/30">
+                      {crit.avgIvoo.toFixed(1)} ({crit.percentIvoo.toFixed(0)}%)
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-black text-blue-950 bg-blue-50/30">
+                      {crit.avgComp.toFixed(1)} ({crit.percentComp.toFixed(0)}%)
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-bold">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${
+                          isIvooLead
+                            ? 'text-emerald-800 bg-emerald-100 font-bold'
+                            : isTie
+                            ? 'text-slate-700 bg-slate-100'
+                            : 'text-rose-800 bg-rose-100 font-bold'
+                        }`}
+                      >
+                        {isIvooLead ? (
+                          <ArrowUpRight className="w-3.5 h-3.5 text-emerald-700" />
+                        ) : isTie ? null : (
+                          <ArrowDownRight className="w-3.5 h-3.5 text-rose-700" />
+                        )}
+                        {crit.delta >= 0 ? '+' : ''}
+                        {crit.delta.toFixed(1)} pts
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded text-xs font-mono font-black ${
+                          isIvooLead
+                            ? 'bg-lime-400 text-slate-950 border border-lime-500'
+                            : isTie
+                            ? 'bg-slate-200 text-slate-800'
+                            : 'bg-blue-100 text-blue-900 border border-blue-300'
+                        }`}
+                      >
+                        {crit.winner}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 4. Key Metrics Summary Cards for Filtered Set */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs uppercase font-semibold text-slate-500">Promedio General</span>
+          <span className="text-xs uppercase font-semibold text-slate-500">
+            Promedio Segmentado
+          </span>
           <div className="mt-2 flex items-baseline gap-1.5">
             <span className="text-3xl font-black text-slate-900">{stats.overallAvg.toFixed(1)}</span>
             <span className="text-xs text-slate-400 font-semibold">/ 100</span>
@@ -142,7 +513,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <span className="text-xs text-rose-600 font-semibold">({stats.closedCount} / {stats.total})</span>
           </div>
           <span className="inline-block mt-2 text-xs font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded">
-            {stats.closedCount === 0 ? 'Crítico transversal' : 'En seguimiento'}
+            {stats.closedCount === 0 ? 'Crítico transversal' : `${stats.closedCount} venta(s) cerrada(s)`}
           </span>
         </div>
 
@@ -170,20 +541,20 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Ranking Table */}
+      {/* 5. Ranking Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500" />
-              Ranking de Visitas y Puntuación General
+              <span>Ranking de Visitas y Puntuación General ({stats.periodText})</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Ordenado de mayor a menor desempeño global sobre 100 puntos
             </p>
           </div>
           <div className="text-xs text-slate-600 font-medium bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-            <strong>Muestra:</strong> {stats.total} auditorías completas
+            <strong>Muestra Activa:</strong> {stats.total} auditorías
           </div>
         </div>
 
@@ -192,7 +563,8 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <thead className="bg-slate-100/80 text-xs font-bold uppercase text-slate-600 border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4 w-12 text-center">#</th>
-                <th className="py-3.5 px-4">Tienda</th>
+                <th className="py-3.5 px-4">Cadena</th>
+                <th className="py-3.5 px-4">Tienda / Sucursal</th>
                 <th className="py-3.5 px-4">Ciudad</th>
                 <th className="py-3.5 px-4">Vendedor</th>
                 <th className="py-3.5 px-4 text-center">Punt.</th>
@@ -210,6 +582,9 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                 >
                   <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-500">
                     {idx + 1}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    {getBrandBadge(item.brand || item.storeName, item.brandCategory)}
                   </td>
                   <td className="py-3.5 px-4 font-bold text-slate-900 group-hover:text-lime-700">
                     {item.storeName}
@@ -264,13 +639,13 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         </div>
       </div>
 
-      {/* 4. Comparative Matrix by Criteria (Stores x 9 Criteria) */}
+      {/* 6. Full Criteria Matrix (Tiendas x 9 Criterios) */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-200 bg-slate-50">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-slate-900">
-                Comparativo por Criterio (Matriz Detallada)
+                Matriz General por Criterio ({stats.periodText})
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Desglose cuantitativo de puntuación por cada uno de los 9 criterios metodológicos
@@ -385,25 +760,25 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         </div>
       </div>
 
-      {/* 5. Transversal Findings */}
+      {/* 7. Transversal Findings */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Patrones Comunes Negativos */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-200">
           <div className="flex items-center gap-2 text-rose-700 font-bold text-base mb-4">
             <XCircle className="w-5 h-5 shrink-0" />
-            <span>Patrones Críticos y Brechas Identificadas ({stats.total} Evaluaciones)</span>
+            <span>Patrones Críticos y Brechas Identificadas ({stats.periodText})</span>
           </div>
           <ul className="space-y-3.5 text-xs sm:text-sm text-slate-700 leading-relaxed">
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Cierre comercial deficitario ({stats.closedPercentage.toFixed(0)}% de éxito):</strong> En {stats.total - stats.closedCount} de las {stats.total} tiendas evaluadas, el vendedor omitió formular un intento explícito de cierre o apartado, dejando marchar al cliente ante dudas de aplazamiento.
+                <strong>Cierre comercial deficitario ({stats.closedPercentage.toFixed(0)}% de éxito):</strong> En {stats.total - stats.closedCount} de las {stats.total} visitas evaluadas, el vendedor omitió formular un intento explícito de cierre o apartado.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Pérdida de captación de clientes ({stats.contactPercentage.toFixed(0)}% de efectividad):</strong> Solo se registraron datos en {stats.contactCount} de las {stats.total} interacciones, desaprovechando la oportunidad de enviar cotizaciones formales por WhatsApp o realizar seguimiento comercial.
+                <strong>Pérdida de captación de clientes ({stats.contactPercentage.toFixed(0)}% de efectividad):</strong> Solo se registraron datos en {stats.contactCount} de las {stats.total} interacciones, desaprovechando la oportunidad de enviar cotizaciones formales por WhatsApp.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
@@ -415,7 +790,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Dispersión de servicio:</strong> La brecha entre la tienda con mayor puntuación ({stats.topEvaluation?.storeName} con {stats.topEvaluation?.score} pts) y la de menor ({stats.bottomEvaluation?.storeName} con {stats.bottomEvaluation?.score} pts) es de {((stats.topEvaluation?.score || 0) - (stats.bottomEvaluation?.score || 0))} puntos, evidenciando heterogeneidad en los estándares de atención.
+                <strong>Dispersión de servicio:</strong> La brecha entre la tienda con mayor puntuación ({stats.topEvaluation?.storeName} con {stats.topEvaluation?.score} pts) y la de menor ({stats.bottomEvaluation?.storeName} con {stats.bottomEvaluation?.score} pts) es de {((stats.topEvaluation?.score || 0) - (stats.bottomEvaluation?.score || 0))} puntos.
               </div>
             </li>
           </ul>
@@ -443,20 +818,20 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Exhibición y ambientación tecnológica:</strong> Equipos de pantallas y tecnología encendidos y exhibidos adecuadamente para permitir la comparación visual directa por parte del comprador.
+                <strong>Exhibición y ambientación tecnológica:</strong> Equipos de pantallas y tecnología encendidos y exhibidos adecuadamente para permitir la comparación visual directa.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Tiendas de referencia en el ranking:</strong> Sucursales como {stats.topEvaluation?.storeName} ({stats.topEvaluation?.score} pts) demuestran que la aplicación consistente del protocolo eleva el nivel de satisfacción comercial.
+                <strong>Tiendas de referencia:</strong> Sucursales como {stats.topEvaluation?.storeName} ({stats.topEvaluation?.score} pts) demuestran que la aplicación consistente del protocolo eleva el nivel de satisfacción comercial.
               </div>
             </li>
           </ul>
         </div>
       </div>
 
-      {/* 6. Strategic Priority Recommendations */}
+      {/* 8. Strategic Recommendations */}
       <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-800">
         <div className="flex items-center gap-2 text-lime-400 font-mono text-xs uppercase font-bold tracking-widest mb-2">
           <Lightbulb className="w-4 h-4" />
@@ -496,7 +871,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
               <span>Estandarizar el protocolo de saludo y bienvenida en 10 segundos</span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              Exigir contacto visual inmediato, sonrisa, presentación con nombre del asesor y bienvenida proactiva en puerta, erradicando los tiempos muertos de espera y el uso de celulares personales en pasillos.
+              Exigir contacto visual inmediato, sonrisa, presentación con nombre del asesor y bienvenida proactiva en puerta, erradicando los tiempos muertos de espera.
             </p>
           </div>
 
@@ -506,27 +881,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
               <span>Profundizar el sondeo de necesidades y venta consultiva</span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              Capacitar en preguntas abiertas sobre dimensiones, usos específicos y preferencias antes de ofrecer opciones, evitando limitarse únicamente al rango de precio inicial del cliente.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
-              <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">5</span>
-              <span>Incentivar la venta cruzada (Cross-Selling)</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              Vincular de forma natural accesorios complementarios indispensables (protectores de voltaje, soportes de pared articulados, cables certificados y periféricos) en cada cotización realizada.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
-              <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">6</span>
-              <span>Homologación de estándares entre sucursales</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              Desplegar un plan de acompañamiento y nivelación en las sucursales con calificaciones menores a 60 puntos en las plazas de {stats.citiesText}, alineándolas con el rendimiento de las tiendas líderes.
+              Capacitar en preguntas abiertas sobre dimensiones, usos específicos y preferencias antes de ofrecer opciones, evitando limitarse únicamente al rango de precio inicial.
             </p>
           </div>
         </div>
@@ -534,4 +889,3 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
     </div>
   );
 };
-

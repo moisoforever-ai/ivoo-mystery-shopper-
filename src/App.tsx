@@ -5,18 +5,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
-import { PortadaView } from './components/PortadaView';
+import { AudioAuditorHub } from './components/AudioAuditorHub';
 import { ResumenComparativoView } from './components/ResumenComparativoView';
 import { EvaluacionesIndividualesView } from './components/EvaluacionesIndividualesView';
-import { AudioVerificationStudio } from './components/AudioVerificationStudio';
-import { GoogleDrivePanel } from './components/GoogleDrivePanel';
 import { PrintReportView } from './components/PrintReportView';
 import { EVALUATIONS_DATA } from './data/evaluationsData';
 import { StoreEvaluation } from './types';
 import { loadEvaluations, saveEvaluationsSafely } from './services/storageManager';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'portada' | 'resumen' | 'evaluaciones' | 'audios' | 'drive'>('portada');
+  const [activeTab, setActiveTab] = useState<'audios' | 'resumen' | 'evaluaciones'>('audios');
   const [evaluations, setEvaluations] = useState<StoreEvaluation[]>(() => {
     return loadEvaluations();
   });
@@ -30,9 +28,28 @@ export default function App() {
 
   const handleUpdateEvaluation = (updated: StoreEvaluation) => {
     setEvaluations((prev) => {
-      const updatedList = prev.map((item) => (item.id === updated.id ? updated : item));
+      const exists = prev.some((e) => e.id === updated.id);
+      const updatedList = exists
+        ? prev.map((item) => (item.id === updated.id ? updated : item))
+        : [updated, ...prev];
       saveEvaluationsSafely(updatedList, `Actualización ${updated.storeName}`);
       return updatedList;
+    });
+  };
+
+  const handleUpdateEvaluationsList = (newList: StoreEvaluation[]) => {
+    setEvaluations(newList);
+    saveEvaluationsSafely(newList, 'Actualización masiva de evaluaciones');
+  };
+
+  const handleDeleteEvaluation = (storeId: string) => {
+    setEvaluations((prev) => {
+      const filtered = prev.filter((e) => e.id !== storeId);
+      saveEvaluationsSafely(filtered, 'Eliminación de evaluación');
+      if (selectedStoreId === storeId && filtered.length > 0) {
+        setSelectedStoreId(filtered[0].id);
+      }
+      return filtered;
     });
   };
 
@@ -62,18 +79,26 @@ export default function App() {
         onPrint={() => setIsPrintOpen(true)}
         evaluations={evaluations}
         onResetEvaluations={(resetEvals) => setEvaluations(resetEvals)}
+        selectedStoreId={selectedStoreId}
+        onSelectStore={(id) => setSelectedStoreId(id)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16">
-        {activeTab === 'portada' && (
-          <PortadaView
+        {/* Tab 1: Primary Audio & AI Studio Hub */}
+        {activeTab === 'audios' && (
+          <AudioAuditorHub
             evaluations={evaluations}
-            onGoToStore={handleGoToStore}
-            onGoToResumen={handleGoToResumen}
+            selectedStoreId={selectedStoreId}
+            onSelectStore={(id) => setSelectedStoreId(id)}
+            onUpdateEvaluation={handleUpdateEvaluation}
+            onUpdateEvaluationsList={handleUpdateEvaluationsList}
+            onGoToConsolidated={handleGoToResumen}
+            onGoToFicha={handleGoToStore}
           />
         )}
 
+        {/* Tab 2: Comparative Summary & Benchmark */}
         {activeTab === 'resumen' && (
           <ResumenComparativoView
             evaluations={evaluations}
@@ -81,34 +106,15 @@ export default function App() {
           />
         )}
 
+        {/* Tab 3: Individual Store Mystery Shopper Scorecards */}
         {activeTab === 'evaluaciones' && (
           <EvaluacionesIndividualesView
             evaluations={evaluations}
             selectedStoreId={selectedStoreId}
             onSelectStore={(id) => setSelectedStoreId(id)}
             onUpdateEvaluation={handleUpdateEvaluation}
+            onDeleteEvaluation={handleDeleteEvaluation}
             onGoToAudios={handleGoToAudios}
-          />
-        )}
-
-        {activeTab === 'audios' && (
-          <AudioVerificationStudio
-            evaluations={evaluations}
-            selectedStoreId={selectedStoreId}
-            onSelectStore={(id) => setSelectedStoreId(id)}
-            onUpdateEvaluation={handleUpdateEvaluation}
-            onGoToConsolidated={handleGoToResumen}
-          />
-        )}
-
-        {activeTab === 'drive' && (
-          <GoogleDrivePanel
-            evaluations={evaluations}
-            onUpdateEvaluations={(newList) => {
-              setEvaluations(newList);
-              saveEvaluationsSafely(newList, 'Sincronización de Google Drive');
-            }}
-            onGoToResumen={handleGoToResumen}
           />
         )}
       </main>
@@ -128,10 +134,10 @@ export default function App() {
             <span className="font-mono font-black text-lime-400 bg-slate-800 px-2 py-0.5 rounded">
               IVOO
             </span>
-            <span>Auditoría de Calidad y Mystery Shopper • Mayo 2026</span>
+            <span>Auditoría de Calidad y Mystery Shopper • Julio 2026</span>
           </div>
           <div className="text-slate-500 text-center sm:text-right">
-            <span>Uso confidencial interno • Auto-depuración de memoria activa</span>
+            <span>Uso confidencial interno • Auditoría impulsada por Gemini 3.7 Flash</span>
           </div>
         </div>
       </footer>

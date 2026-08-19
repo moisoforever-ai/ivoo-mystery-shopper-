@@ -1,6 +1,7 @@
 import { StoreEvaluation, DriveFileItem, CriterionScore, TranscriptLine } from '../types';
 import { IVOO_CRITERIA, getCriterionStatus, getOverallLevel } from '../data/criteria';
 import { EVALUATIONS_DATA } from '../data/evaluationsData';
+import { extractBrand, extractMonthPeriod, normalizeEvaluation } from '../utils/evaluationHelpers';
 
 /**
  * Parses store name, chain, city, and date from a drive filename
@@ -90,7 +91,6 @@ export function generateEvaluationFromFile(file: DriveFileItem, index: number): 
   // Search exact match in pre-transcribed EVALUATIONS_DATA
   const matched = EVALUATIONS_DATA.find((e) => {
     const eLower = e.storeName.toLowerCase();
-    const cLower = e.city.toLowerCase();
 
     if (lowerName.includes('daka') && eLower.includes('daka')) {
       if (lowerName.includes('maturin') && eLower.includes('maturín')) return true;
@@ -115,12 +115,12 @@ export function generateEvaluationFromFile(file: DriveFileItem, index: number): 
   });
 
   if (matched) {
-    return {
+    return normalizeEvaluation({
       ...matched,
       audioUrl: file.webViewLink || matched.audioUrl,
       audioDriveId: file.id || matched.audioDriveId,
       ambientNotes: `Auditoría grabada en sucursal ${matched.storeName}. Archivo de origen: ${file.name}.`,
-    };
+    });
   }
 
   // Fallback generation for any unforeseen file
@@ -141,11 +141,16 @@ export function generateEvaluationFromFile(file: DriveFileItem, index: number): 
   });
 
   const totalScore = criteriaBreakdown.reduce((sum, c) => sum + c.score, 0);
+  const { brand, brandCategory } = extractBrand(storeName);
+  const { key: monthPeriod } = extractMonthPeriod(date);
 
-  return {
+  const newEval: StoreEvaluation = {
     id: `eval_drive_${index + 1}_${identifier.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
     identifier: `${identifier}-${String(index + 1).padStart(2, '0')}`,
     storeName,
+    brand,
+    brandCategory,
+    monthPeriod,
     city,
     seller: `Asesor ${storeName}`,
     recordingDate: date,
@@ -181,13 +186,14 @@ export function generateEvaluationFromFile(file: DriveFileItem, index: number): 
     audioUrl: file.webViewLink,
     audioDriveId: file.id,
   };
+
+  return normalizeEvaluation(newEval);
 }
 
 /**
  * Generates an array of evaluations from all drive files
  */
 export function generateEvaluationsFromDriveFiles(files: DriveFileItem[]): StoreEvaluation[] {
-  // Sort files or keep original order
   const candidateFiles = files.filter(
     (f) =>
       f.mimeType.includes('audio') ||
@@ -199,3 +205,4 @@ export function generateEvaluationsFromDriveFiles(files: DriveFileItem[]): Store
 
   return targetFiles.map((file, idx) => generateEvaluationFromFile(file, idx));
 }
+
