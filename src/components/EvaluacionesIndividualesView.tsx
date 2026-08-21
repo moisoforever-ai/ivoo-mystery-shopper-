@@ -329,7 +329,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
                     Transcrito con IA Gemini
                   </span>
                 )}
-                {(!currentEval.verificationStatus || currentEval.verificationStatus === 'unverified') && (
+                {(!currentEval.verificationStatus || currentEval.verificationStatus === 'preliminary') && (
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3 text-amber-600" />
                     Transcripción Preliminar (Sin auditar)
