@@ -3,15 +3,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
-import { AudioAuditorHub } from './components/AudioAuditorHub';
-import { ResumenComparativoView } from './components/ResumenComparativoView';
-import { EvaluacionesIndividualesView } from './components/EvaluacionesIndividualesView';
-import { PrintReportView } from './components/PrintReportView';
 import { EVALUATIONS_DATA } from './data/evaluationsData';
 import { StoreEvaluation } from './types';
 import { loadEvaluations, saveEvaluationsSafely } from './services/storageManager';
+
+// Code-split the heavy views: each one is only downloaded when the user actually
+// navigates to it, instead of all four being bundled into the initial page load.
+// PrintReportView in particular pulls in jspdf + html2canvas, which are large
+// libraries most visits never need since the print modal is opened on demand.
+const AudioAuditorHub = lazy(() =>
+  import('./components/AudioAuditorHub').then((m) => ({ default: m.AudioAuditorHub }))
+);
+const ResumenComparativoView = lazy(() =>
+  import('./components/ResumenComparativoView').then((m) => ({ default: m.ResumenComparativoView }))
+);
+const EvaluacionesIndividualesView = lazy(() =>
+  import('./components/EvaluacionesIndividualesView').then((m) => ({ default: m.EvaluacionesIndividualesView }))
+);
+const PrintReportView = lazy(() =>
+  import('./components/PrintReportView').then((m) => ({ default: m.PrintReportView }))
+);
+
+function ViewLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
+    </div>
+  );
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'audios' | 'resumen' | 'evaluaciones'>('audios');
@@ -85,46 +106,50 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16">
-        {/* Tab 1: Primary Audio & AI Studio Hub */}
-        {activeTab === 'audios' && (
-          <AudioAuditorHub
-            evaluations={evaluations}
-            selectedStoreId={selectedStoreId}
-            onSelectStore={(id) => setSelectedStoreId(id)}
-            onUpdateEvaluation={handleUpdateEvaluation}
-            onUpdateEvaluationsList={handleUpdateEvaluationsList}
-            onGoToConsolidated={handleGoToResumen}
-            onGoToFicha={handleGoToStore}
-          />
-        )}
+        <Suspense fallback={<ViewLoadingFallback />}>
+          {/* Tab 1: Primary Audio & AI Studio Hub */}
+          {activeTab === 'audios' && (
+            <AudioAuditorHub
+              evaluations={evaluations}
+              selectedStoreId={selectedStoreId}
+              onSelectStore={(id) => setSelectedStoreId(id)}
+              onUpdateEvaluation={handleUpdateEvaluation}
+              onUpdateEvaluationsList={handleUpdateEvaluationsList}
+              onGoToConsolidated={handleGoToResumen}
+              onGoToFicha={handleGoToStore}
+            />
+          )}
 
-        {/* Tab 2: Comparative Summary & Benchmark */}
-        {activeTab === 'resumen' && (
-          <ResumenComparativoView
-            evaluations={evaluations}
-            onSelectStore={handleGoToStore}
-          />
-        )}
+          {/* Tab 2: Comparative Summary & Benchmark */}
+          {activeTab === 'resumen' && (
+            <ResumenComparativoView
+              evaluations={evaluations}
+              onSelectStore={handleGoToStore}
+            />
+          )}
 
-        {/* Tab 3: Individual Store Mystery Shopper Scorecards */}
-        {activeTab === 'evaluaciones' && (
-          <EvaluacionesIndividualesView
-            evaluations={evaluations}
-            selectedStoreId={selectedStoreId}
-            onSelectStore={(id) => setSelectedStoreId(id)}
-            onUpdateEvaluation={handleUpdateEvaluation}
-            onDeleteEvaluation={handleDeleteEvaluation}
-            onGoToAudios={handleGoToAudios}
-          />
-        )}
+          {/* Tab 3: Individual Store Mystery Shopper Scorecards */}
+          {activeTab === 'evaluaciones' && (
+            <EvaluacionesIndividualesView
+              evaluations={evaluations}
+              selectedStoreId={selectedStoreId}
+              onSelectStore={(id) => setSelectedStoreId(id)}
+              onUpdateEvaluation={handleUpdateEvaluation}
+              onDeleteEvaluation={handleDeleteEvaluation}
+              onGoToAudios={handleGoToAudios}
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Full Document Print & PDF Export Modal */}
       {isPrintOpen && (
-        <PrintReportView
-          evaluations={evaluations}
-          onClose={() => setIsPrintOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <PrintReportView
+            evaluations={evaluations}
+            onClose={() => setIsPrintOpen(false)}
+          />
+        </Suspense>
       )}
 
       {/* Footer */}
