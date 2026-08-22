@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { friendlyGeminiErrorMessage } from "./server/geminiErrors";
 
 dotenv.config();
 
@@ -55,335 +56,6 @@ interface UploadSession {
 }
 
 const uploadSessions = new Map<string, UploadSession>();
-
-// Smart fallback generator when API key is missing or authentication fails
-function generateSmartAuditFallback(params: {
-  storeName: string;
-  city: string;
-  recordingDate?: string;
-  productEvaluated?: string;
-  additionalContext?: string;
-}) {
-  const { storeName, city, recordingDate = "9 de julio de 2026", productEvaluated = 'Televisores y Aires Acondicionados' } = params;
-  const isDelicias = storeName.toUpperCase().includes("DELICIAS");
-  const isPLC = storeName.toUpperCase().includes("PUERTO LA CRUZ");
-  const isCabimas = storeName.toUpperCase().includes("CABIMAS");
-  const isMaturin = storeName.toUpperCase().includes("MATURIN") || storeName.toUpperCase().includes("MATURÍN");
-  const isOjeda = storeName.toUpperCase().includes("OJEDA");
-  const isSF = storeName.toUpperCase().includes("SAN FRANCISCO");
-  const isCentro = storeName.toUpperCase().includes("CENTRO");
-
-  const seller = isDelicias
-    ? "Santiago"
-    : isPLC
-    ? "Leoneri"
-    : isCabimas
-    ? "Samuel Matos"
-    : isMaturin
-    ? "Reina"
-    : isOjeda
-    ? "Catherine D'Avila"
-    : isSF
-    ? "Daniel García"
-    : isCentro
-    ? "No identificado"
-    : `Asesor ${storeName}`;
-
-  const transcript = isDelicias
-    ? [
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "00:05",
-          text: `Buenas tardes, mi nombre es Elías Gordoña, procedo a hacer el recorrido por la tienda IVOO, ubicada en la avenida 15 Delicias, cuando son las 5 y 2 de la tarde del jueves 9 de julio. [Narración de apertura del mystery shopper mientras cruza hacia la tienda]`,
-        },
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "00:45",
-          text: `Hermano, estoy ubicando precios de televisores.`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: "Santiago",
-          timestamp: "01:00",
-          text: `¿De cuántas pulgadas estás buscando?`,
-        },
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "01:15",
-          text: `Estoy interesado entre 40 y 43. ¿Qué tienes disponible?`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: "Santiago",
-          timestamp: "01:30",
-          text: `Tengo marca Siragon: uno de 40 pulgadas en 225, y uno de 43. Eso es lo que tengo de esa marca. El Alwa está ahorita en 300, el de 40, es más caro. Siragon es la principal marca, la que maneja el mejor tipo de pantalla.`,
-        },
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "03:20",
-          text: `Santiago. Con el tema de Cashea, estuve viendo una publicación por Instagram que está con el cero inicial.`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: "Santiago",
-          timestamp: "03:45",
-          text: `Sí, eso es para nivel 6. Con la opción de cero por ciento inicial sería a tres cuotas. La otra modalidad es con el 20 por ciento inicial y tres cuotas. Para optar a más cuotas: factura mayor a 300 dólares, seis cuotas; mayor a 450, nueve cuotas; y mayor a 600, doce cuotas.`,
-        },
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "05:10",
-          text: `Vamos a hacer un cálculo, porque estoy interesado en un televisor y un aire. El cuarto es cuatro por cuatro.`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: "Santiago",
-          timestamp: "05:40",
-          text: `El de 18 mil BTU tengo ahorita con tecnología Inverter, refrigerante R32 en 590. Te voy a hacer el cálculo por las dos cosas: 815 en total. El inicial sería el 40%, que son 326. Con eso sacas el inicial y el resto te queda a 12 cuotas de 40.`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: "Santiago",
-          timestamp: "07:30",
-          text: `Para mañana, si quieres, te doy mi número por cualquier cambio, o yo puedo apartarles la mercancía para cuando vengan a facturar. 0424-369-8-99. Coloca Santiago, Ivo.`,
-        },
-      ]
-    : [
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "00:10",
-          text: `Buenas tardes, estoy realizando la visita de Mystery Shopper en ${storeName}. Busco asesoría para televisor y aire acondicionado.`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: seller,
-          timestamp: "00:30",
-          text: `Buenas tardes, bienvenido a ${storeName}. Por acá tenemos las opciones en exhibición. ¿De qué medidas busca para su espacio?`,
-        },
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "01:20",
-          text: `Busco un Smart TV de 40 a 43 pulgadas y un aire split. ¿Cuáles son los precios y opciones de financiamiento con Cashea?`,
-        },
-        {
-          speaker: "Vendedor" as const,
-          speakerName: seller,
-          timestamp: "02:10",
-          text: `Tenemos opciones en marca principal con garantía de tienda. Se puede pagar de contado con descuento en divisa, o por Cashea en 3, 6 o 12 cuotas dependiendo del nivel y monto de compra.`,
-        },
-        {
-          speaker: "Mystery Shopper" as const,
-          timestamp: "04:30",
-          text: `Muchas gracias por la información, voy a coordinar para definir la compra.`,
-        },
-      ];
-
-  const criteriaBreakdown = isDelicias
-    ? [
-        {
-          criterionId: "saludo",
-          criterionName: "Saludo y bienvenida",
-          score: 6,
-          maxScore: 10,
-          observation: "El asesor Santiago abordó al cliente de forma natural apenas cruzó hacia la tienda, pero el personal de seguridad no dio la bienvenida ni al entrar ni al salir, pese a que el cliente buscó contacto visual con él.",
-          status: "acceptable",
-        },
-        {
-          criterionId: "necesidades",
-          criterionName: "Detección de necesidades",
-          score: 7,
-          maxScore: 10,
-          observation: "Preguntó pulgadas de TV y tamaño del cuarto antes de recomendar el aire acondicionado (3,5x3,5 m, opción de 18.000 BTU), aunque no profundizó en el presupuesto total antes de mostrar productos.",
-          status: "acceptable",
-        },
-        {
-          criterionId: "conocimiento",
-          criterionName: "Conocimiento de producto",
-          score: 13,
-          maxScore: 15,
-          observation: "Explicó con solidez las diferencias entre Siragon, Alwa y Sony, justificando por qué Siragon mantiene mejor relación calidad-precio, y detalló la tecnología Inverter y el refrigerante R32 del aire.",
-          status: "good",
-        },
-        {
-          criterionId: "opciones",
-          criterionName: "Presentación de opciones",
-          score: 12,
-          maxScore: 15,
-          observation: "Mostró alternativas de TV (40\" y 43\") y de aire (18 y 24 BTU), armando un combo TV + aire a solicitud del cliente con cálculo conjunto.",
-          status: "good",
-        },
-        {
-          criterionId: "cierre",
-          criterionName: "Técnica de venta y cierre",
-          score: 8,
-          maxScore: 15,
-          observation: "Calculó el combo completo con cifras exactas, pero no cerró la venta en el momento; ofreció apartar la mercancía para el día siguiente, dejando la decisión pendiente de la esposa del cliente.",
-          status: "acceptable",
-        },
-        {
-          criterionId: "financiamiento",
-          criterionName: "Manejo de financiamiento",
-          score: 9,
-          maxScore: 10,
-          observation: "Detalló con precisión los niveles de Cashea (0% inicial a 3 cuotas para nivel 6, 20% inicial como alternativa), los umbrales por monto (6, 9 y 12 cuotas) y el procedimiento de terceros con declaración jurada.",
-          status: "good",
-        },
-        {
-          criterionId: "actitud",
-          criterionName: "Actitud y amabilidad",
-          score: 9,
-          maxScore: 10,
-          observation: "Mantuvo contacto visual con el cliente mientras atendía a otra persona, sin dejarlo desatendido; trato cordial y profesional durante todo el recorrido.",
-          status: "good",
-        },
-        {
-          criterionId: "despedida",
-          criterionName: "Despedida y seguimiento",
-          score: 8,
-          maxScore: 10,
-          observation: "Se despidió cordialmente y entregó su número personal para coordinar la compra al día siguiente, aunque no propuso enviar una cotización escrita.",
-          status: "good",
-        },
-        {
-          criterionId: "proactividad",
-          criterionName: "Proactividad comercial",
-          score: 4,
-          maxScore: 5,
-          observation: "Ofreció apartar la mercancía y dio seguimiento proactivo mediante su número personal para cerrar la compra al día siguiente.",
-          status: "good",
-        },
-      ]
-    : [
-        {
-          criterionId: "saludo",
-          criterionName: "Saludo y bienvenida",
-          score: 6,
-          maxScore: 10,
-          observation: `Recepción en piso en ${storeName}. Se observó oportunidad de optimizar el abordaje inicial y la bienvenida por parte de seguridad.`,
-          status: "acceptable",
-        },
-        {
-          criterionId: "necesidades",
-          criterionName: "Detección de necesidades",
-          score: 6,
-          maxScore: 10,
-          observation: `El asesor respondió a las consultas directas pero se requiere profundizar en sondeo de espacio y presupuesto antes de cotizar.`,
-          status: "acceptable",
-        },
-        {
-          criterionId: "conocimiento",
-          criterionName: "Conocimiento de producto",
-          score: 10,
-          maxScore: 15,
-          observation: `Explicación técnica de modelos exhibidos, marcas disponibles y condiciones de garantía de tienda.`,
-          status: "acceptable",
-        },
-        {
-          criterionId: "opciones",
-          criterionName: "Presentación de opciones",
-          score: 9,
-          maxScore: 15,
-          observation: `Presentó alternativas en exhibición con diferentes rangos de precio.`,
-          status: "acceptable",
-        },
-        {
-          criterionId: "cierre",
-          criterionName: "Técnica de venta y cierre",
-          score: 4,
-          maxScore: 15,
-          observation: `No se intentó un cierre directo o propuesta de reserva en el momento; la visita culminó sin compromiso formal de compra.`,
-          status: "deficient",
-        },
-        {
-          criterionId: "financiamiento",
-          criterionName: "Manejo de financiamiento",
-          score: 8,
-          maxScore: 10,
-          observation: `Explicó modalidades de Cashea por niveles y cuotas, así como descuentos en divisas y bolívares.`,
-          status: "good",
-        },
-        {
-          criterionId: "actitud",
-          criterionName: "Actitud y amabilidad",
-          score: 8,
-          maxScore: 10,
-          observation: `Trato educado y dispuesto a resolver dudas del cliente durante el recorrido.`,
-          status: "good",
-        },
-        {
-          criterionId: "despedida",
-          criterionName: "Despedida y seguimiento",
-          score: 6,
-          maxScore: 10,
-          observation: `Despedida cordial con entrega de contacto verbal o nombre del asesor.`,
-          status: "acceptable",
-        },
-        {
-          criterionId: "proactividad",
-          criterionName: "Proactividad comercial",
-          score: 3,
-          maxScore: 5,
-          observation: `Oportunidad de reforzar la venta cruzada y el envío de cotizaciones por WhatsApp.`,
-          status: "acceptable",
-        },
-      ];
-
-  const totalScore = criteriaBreakdown.reduce((acc, c) => acc + c.score, 0);
-  const level = totalScore >= 75 ? "Bueno" : totalScore >= 50 ? "Regular" : "Deficiente";
-
-  return {
-    storeName,
-    city,
-    seller,
-    recordingDate,
-    productEvaluated,
-    duration: isDelicias ? "11 min 17 seg" : "6 min 30 seg",
-    score: totalScore,
-    level,
-    saleClosed: false,
-    contactCaptured: isDelicias || isPLC || isCabimas || isMaturin,
-    narrativeSummary: isDelicias
-      ? "Segunda mejor atención del lote de julio. Santiago (asesor) realizó una asesoría consultiva completa sobre TV y aire acondicionado, con comparación honesta entre marcas y cálculo exacto de un combo con Cashea (inicial de 326 + 12 cuotas de 40). Ofreció apartar la mercancía y entregó su número personal para cerrar al día siguiente. Puntos pendientes: el personal de seguridad no saludó ni a la entrada ni a la salida, y no se intentó un cierre inmediato."
-      : `Evaluación Mystery Shopper en ${storeName} (${city}) realizada el ${recordingDate}. Se evaluaron los 9 criterios de la metodología oficial sobre 100 puntos. El asesor brindó información técnica sobre productos y financiamiento con Cashea. No se concretó cierre directo de venta durante la interacción.`,
-    criteriaBreakdown,
-    strengths: isDelicias
-      ? [
-          "Asesoría consultiva completa: combo TV + aire calculado con cifras exactas de inicial y cuotas.",
-          "Comparación honesta entre marcas (Siragon vs. Alwa vs. Sony) con justificación técnica.",
-          "Acompañamiento visual constante al cliente incluso mientras atendía a otra persona.",
-          "Entregó su número personal y ofreció apartar mercancía para cerrar al día siguiente.",
-        ]
-      : [
-          `Manejo de financiamiento y modalidades de Cashea con desglose de cuotas e iniciales.`,
-          `Trato cordial y respetuoso durante la interacción en tienda.`,
-        ],
-    criticalAreas: isDelicias
-      ? [
-          "Seguridad no saludó ni a la entrada ni a la salida, generando una primera y última impresión débil.",
-          "No se intentó un cierre en el momento pese al alto nivel de interés del cliente.",
-          "No se sondeó el presupuesto total antes de iniciar la presentación de productos.",
-        ]
-      : [
-          `No se ejecutó tentativa de cierre formal o reserva en caja.`,
-          `Sondeo de necesidades superficial antes de presentar opciones.`,
-        ],
-    recommendations: isDelicias
-      ? [
-          "Reforzar el protocolo de bienvenida y despedida del personal de seguridad en todas las tiendas.",
-          "Capacitar en cierre asistido cuando el cliente muestra alto interés y ya tiene cifras claras.",
-          "Ofrecer siempre el envío de cotización por WhatsApp como respaldo del apartado verbal.",
-        ]
-      : [
-          `Implementar protocolo de sondeo obligatorio de 3 preguntas (espacio, uso y presupuesto).`,
-          `Capacitar al equipo en técnicas de cierre y cotización formal por WhatsApp.`,
-        ],
-    transcript,
-    keyQuotes: [
-      { topic: "Financiamiento", quote: "Con la opción de cero por ciento inicial sería a tres cuotas para nivel 6.", timestamp: "03:45" },
-      { topic: "Seguimiento", quote: "Te doy mi número por cualquier cambio, o yo puedo apartarles la mercancía.", timestamp: "07:30" },
-    ],
-    isFallbackAnalysis: true,
-  };
-}
 
 // Helper function to call Gemini with exponential backoff retries and fallback models for high-demand 503/429 mitigation
 async function generateContentWithFallback(params: {
@@ -768,14 +440,16 @@ Escucha el audio adjunto en su totalidad, transcribe todos los turnos de diálog
     const responseText = response.text || "{}";
     const parsedData = JSON.parse(responseText);
 
-    // Calculate total score from criteria
-    let calculatedScore = 0;
-    if (Array.isArray(parsedData.criteriaBreakdown)) {
-      calculatedScore = parsedData.criteriaBreakdown.reduce(
-        (sum: number, c: { score?: number }) => sum + (Number(c.score) || 0),
-        0
-      );
+    // Calculate total score from criteria. If Gemini didn't return usable criteria, that's a
+    // failure too — better to error out than to silently present a fake 0/100 as if it were real.
+    if (!Array.isArray(parsedData.criteriaBreakdown) || parsedData.criteriaBreakdown.length === 0) {
+      throw new Error("Gemini no devolvió los criterios de evaluación esperados en la respuesta.");
     }
+
+    const calculatedScore = parsedData.criteriaBreakdown.reduce(
+      (sum: number, c: { score?: number }) => sum + (Number(c.score) || 0),
+      0
+    );
 
     const level =
       calculatedScore >= 75 ? "Bueno" : calculatedScore >= 50 ? "Regular" : "Deficiente";
@@ -786,13 +460,8 @@ Escucha el audio adjunto en su totalidad, transcribe todos los turnos de diálog
       level,
     };
   } catch (err: any) {
-    console.warn(`[Gemini Fallback Activo] Activando análisis inteligente para ${storeName}:`, err?.message || err);
-    return generateSmartAuditFallback({
-      storeName,
-      city,
-      recordingDate,
-      additionalContext,
-    });
+    console.error(`[Gemini Error] Falló el análisis de audio para ${storeName}:`, err?.message || err);
+    throw new Error(friendlyGeminiErrorMessage(err));
   }
 }
 
@@ -917,6 +586,11 @@ ${transcriptText}`,
     });
 
     const parsed = JSON.parse(response.text || "{}");
+
+    if (!Array.isArray(parsed.criteriaBreakdown) || parsed.criteriaBreakdown.length === 0) {
+      throw new Error("Gemini no devolvió los criterios de evaluación esperados en la respuesta.");
+    }
+
     const score = parsed.criteriaBreakdown.reduce(
       (sum: number, c: { score?: number }) => sum + (Number(c.score) || 0),
       0
@@ -932,16 +606,10 @@ ${transcriptText}`,
       },
     });
   } catch (error: any) {
-    console.warn("Error calling Gemini in regrade-transcript (using smart fallback):", error?.message || error);
-    const fallback = generateSmartAuditFallback({
-      storeName: req.body.storeName || "Tienda Retail",
-      city: req.body.city || "Venezuela",
-      productEvaluated: req.body.productEvaluated || 'Smart TV 55" 4K',
-    });
-    res.json({
-      success: true,
-      data: fallback,
-      notice: "Recálculo procesado con motor heurístico local.",
+    console.error("Error recalculando con Gemini en regrade-transcript:", error?.message || error);
+    res.status(500).json({
+      success: false,
+      error: friendlyGeminiErrorMessage(error),
     });
   }
 });
