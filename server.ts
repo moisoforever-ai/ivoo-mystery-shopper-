@@ -8,7 +8,7 @@ import { friendlyGeminiErrorMessage } from "./server/geminiErrors";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 // Support large audio uploads (up to 50MB base64)
 app.use(express.json({ limit: "60mb" }));
