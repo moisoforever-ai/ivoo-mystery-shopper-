@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
-import { EVALUATIONS_DATA } from './data/evaluationsData';
 import { StoreEvaluation } from './types';
 import { loadEvaluations, saveEvaluationsSafely } from './services/storageManager';
 
@@ -40,7 +39,7 @@ export default function App() {
     return loadEvaluations();
   });
 
-  const [selectedStoreId, setSelectedStoreId] = useState<string>(evaluations[0]?.id || EVALUATIONS_DATA[0].id);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(evaluations[0]?.id || '');
   const [isPrintOpen, setIsPrintOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -106,9 +105,15 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16">
+        {/* Tab 1: Primary Audio & AI Studio Hub.
+            IMPORTANT: this stays mounted at all times (only hidden via CSS when another tab
+            is active) instead of being conditionally rendered. Conditionally rendering it
+            (the old {activeTab === 'audios' && <AudioAuditorHub />} pattern) fully unmounted
+            the component on every tab switch, which could abandon an in-progress audit or
+            batch run and reset its local progress state when the user came back. It has its
+            own Suspense boundary so switching to the other tabs never affects it either. */}
         <Suspense fallback={<ViewLoadingFallback />}>
-          {/* Tab 1: Primary Audio & AI Studio Hub */}
-          {activeTab === 'audios' && (
+          <div style={{ display: activeTab === 'audios' ? 'block' : 'none' }}>
             <AudioAuditorHub
               evaluations={evaluations}
               selectedStoreId={selectedStoreId}
@@ -118,8 +123,10 @@ export default function App() {
               onGoToConsolidated={handleGoToResumen}
               onGoToFicha={handleGoToStore}
             />
-          )}
+          </div>
+        </Suspense>
 
+        <Suspense fallback={<ViewLoadingFallback />}>
           {/* Tab 2: Comparative Summary & Benchmark */}
           {activeTab === 'resumen' && (
             <ResumenComparativoView

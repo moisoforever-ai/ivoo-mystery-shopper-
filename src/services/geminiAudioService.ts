@@ -163,6 +163,28 @@ async function prepareAudioBlob(file: File | Blob): Promise<{ blob: Blob; mimeTy
 }
 
 /**
+ * Wraps a fetch call with a hard timeout. Without this, a request that never gets a response
+ * (e.g. the free hosting instance restarting mid-request) leaves the UI stuck on "processing"
+ * forever — the promise never resolves or rejects, so the status badge never updates.
+ */
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error(
+        `La solicitud tardó demasiado y se canceló (más de ${Math.round(timeoutMs / 1000)}s sin respuesta del servidor). Intenta de nuevo — si vuelve a pasar, el servidor puede estar reiniciándose.`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Uploads audio using chunked transfer to avoid HTTP 413 (Payload Too Large) errors
  */
 async function uploadAndTranscribeChunked(
@@ -172,25 +194,31 @@ async function uploadAndTranscribeChunked(
   onProgress?: (stage: string) => void
 ): Promise<AudioAuditResult> {
   const CHUNK_SIZE = 512 * 1024; // 512 KB per chunk (ensures payload is well below Nginx 1MB limits)
+  const CHUNK_TIMEOUT_MS = 30 * 1000; // Each small chunk upload should be fast
+  const PROCESS_TIMEOUT_MS = 4 * 60 * 1000; // Gemini transcription + audit can legitimately take a while
   const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
   const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 
   onProgress?.(`Iniciando sesión de transferencia (${totalChunks} fragmentos)...`);
 
   // Step 1: Initialize session
-  const initRes = await fetch('/api/gemini/init-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId,
-      totalChunks,
-      mimeType,
-      storeName: params.storeName,
-      city: params.city,
-      recordingDate: params.recordingDate || 'Julio 2026',
-      additionalContext: params.additionalContext,
-    }),
-  });
+  const initRes = await fetchWithTimeout(
+    '/api/gemini/init-session',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        totalChunks,
+        mimeType,
+        storeName: params.storeName,
+        city: params.city,
+        recordingDate: params.recordingDate || 'Julio 2026',
+        additionalContext: params.additionalContext,
+      }),
+    },
+    CHUNK_TIMEOUT_MS
+  );
 
   if (!initRes.ok) {
     const err = await initRes.json().catch(() => ({}));
@@ -207,15 +235,19 @@ async function uploadAndTranscribeChunked(
     const percent = Math.round(((i + 1) / totalChunks) * 100);
     onProgress?.(`Transfiriendo audio seguro: fragmento ${i + 1} de ${totalChunks} (${percent}%)...`);
 
-    const chunkRes = await fetch('/api/gemini/upload-chunk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        chunkIndex: i,
-        chunkBase64,
-      }),
-    });
+    const chunkRes = await fetchWithTimeout(
+      '/api/gemini/upload-chunk',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          chunkIndex: i,
+          chunkBase64,
+        }),
+      },
+      CHUNK_TIMEOUT_MS
+    );
 
     if (!chunkRes.ok) {
       const err = await chunkRes.json().catch(() => ({}));
@@ -226,11 +258,15 @@ async function uploadAndTranscribeChunked(
   // Step 3: Process with Gemini
   onProgress?.('Gemini 3.7 Flash procesando grabación: Transcribiendo verbatim y auditando diálogos...');
 
-  const processRes = await fetch('/api/gemini/process-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId }),
-  });
+  const processRes = await fetchWithTimeout(
+    '/api/gemini/process-session',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    },
+    PROCESS_TIMEOUT_MS
+  );
 
   if (!processRes.ok) {
     const err = await processRes.json().catch(() => ({}));

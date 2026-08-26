@@ -184,21 +184,26 @@ export function saveEvaluationsSafely(evaluations: StoreEvaluation[], reason: st
 }
 
 /**
- * Load evaluations from storage with fallback
+ * Load evaluations from storage with fallback. IMPORTANT: a fresh browser (or one where the
+ * user has deleted everything) must start genuinely empty — it must never silently repopulate
+ * with the bundled sample/demo evaluations. Those only exist for the explicit "cargar datos de
+ * muestra" action in resetToFactoryData(), never as an automatic default.
  */
 export function loadEvaluations(): StoreEvaluation[] {
   try {
     const saved = localStorage.getItem(EVALS_STORAGE_KEY) || localStorage.getItem('ivoo_mystery_shopper_evaluations_july2026_v2');
-    if (saved) {
+    if (saved !== null) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
+        // Respect an intentionally empty saved list too — don't treat 0 evaluations as "nothing
+        // was ever saved" and silently refill it with sample data.
         return normalizeEvaluationsList(parsed);
       }
     }
   } catch (e) {
     console.warn('Error loading evaluations from storage', e);
   }
-  return normalizeEvaluationsList(EVALUATIONS_DATA);
+  return [];
 }
 
 /**
