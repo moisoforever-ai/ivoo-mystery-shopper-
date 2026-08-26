@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { computeBlockPageSlices } from '../utils/pdfPagination';
 
 interface PrintReportViewProps {
   evaluations?: StoreEvaluation[];
@@ -51,34 +52,70 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
 
     try {
       const element = documentRef.current;
+      const scale = 2; // High resolution
+
+      // IMPORTANT: no `windowWidth` override here. We measure atom positions from the live,
+      // currently-displayed DOM (getBoundingClientRect) and need those measurements to line up
+      // pixel-for-pixel with what html2canvas actually renders. Forcing a different virtual
+      // window width than what's on screen would make the canvas reflow differently than the
+      // DOM we measured, throwing off every cut point.
       const canvas = await html2canvas(element, {
-        scale: 2, // High resolution
+        scale,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 1200,
       });
 
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-
       const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      const imgHeightMm = (canvas.height * pdfWidth) / canvas.width;
 
-      // Page 1
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
+      // Canvas pixels per mm of PDF page (the image is always placed at width = pdfWidth).
+      const canvasPxPerMm = canvas.width / pdfWidth;
+      const pageHeightPx = pdfHeight * canvasPxPerMm;
 
-      // Remaining pages
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pdfHeight;
+      const imgData = canvas.toDataURL('image/png');
+
+      // Renders one page: the full document image, shifted up so that `topPx` aligns with the
+      // top of the current page. The page's own physical boundary clips everything below it —
+      // this is the same placement trick the original implementation used; only the choice of
+      // where to cut (topPx) is smarter now.
+      const renderPage = (topPx: number) => {
+        const topMm = topPx / canvasPxPerMm;
+        pdf.addImage(imgData, 'PNG', 0, -topMm, imgWidth, imgHeightMm, undefined, 'FAST');
+      };
+
+      // Each "page-break-after" element is a block that must always start on a fresh page
+      // (cover, the comparative summary, and each individual store evaluation). Within a block,
+      // we split by its marked [data-pdf-atom] children so a page break never falls in the
+      // middle of a paragraph, table, or transcript line — only between them.
+      const containerRect = element.getBoundingClientRect();
+      const topBlocks = Array.from(element.querySelectorAll<HTMLElement>('.page-break-after'));
+      const pxScale = canvas.width / containerRect.width;
+
+      let isFirstPage = true;
+
+      for (const block of topBlocks) {
+        const atomEls = Array.from(block.querySelectorAll<HTMLElement>('[data-pdf-atom]'));
+        const candidates = atomEls.length > 0 ? atomEls : [block];
+
+        const atoms = candidates.map((atomEl) => {
+          const rect = atomEl.getBoundingClientRect();
+          return {
+            top: (rect.top - containerRect.top) * pxScale,
+            bottom: (rect.bottom - containerRect.top) * pxScale,
+          };
+        });
+
+        const slices = computeBlockPageSlices(atoms, pageHeightPx);
+
+        for (const slice of slices) {
+          if (!isFirstPage) pdf.addPage();
+          isFirstPage = false;
+          renderPage(slice.top);
+        }
       }
 
       const fileName = `Informe_Mystery_Shopper_IVOO_Consolidado_${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -308,7 +345,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
 
         {/* ================= RESUMEN COMPARATIVO ================= */}
         <div className="border-b-2 border-slate-200 pb-10 page-break-after space-y-6">
-          <div>
+          <div data-pdf-atom>
             <h2 className="text-2xl font-black text-slate-950 uppercase tracking-tight">
               Resumen Comparativo
             </h2>
@@ -318,7 +355,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           </div>
 
           {/* Ranking Table */}
-          <div>
+          <div data-pdf-atom>
             <h3 className="text-sm font-bold text-slate-900 mb-2">Ranking de Visitas</h3>
             <table className="w-full text-left text-xs border border-slate-300">
               <thead className="bg-slate-100 font-bold text-slate-700">
@@ -351,7 +388,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           </div>
 
           {/* Criteria Matrix Table */}
-          <div>
+          <div data-pdf-atom>
             <h3 className="text-sm font-bold text-slate-900 mb-2">Comparativo por Criterio (9 Criterios)</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-center text-[10px] border border-slate-300">
@@ -391,7 +428,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           </div>
 
           {/* Transversal findings */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div data-pdf-atom className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="border border-rose-200 bg-rose-50/50 p-3 rounded">
               <h4 className="font-bold text-rose-900 mb-2">Patrones Críticos y Oportunidades:</h4>
               <ul className="space-y-1 text-slate-700 list-disc list-inside leading-tight">
@@ -414,7 +451,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           </div>
 
           {/* Priority recommendations */}
-          <div className="border border-slate-300 bg-slate-50 p-3 rounded text-xs">
+          <div data-pdf-atom className="border border-slate-300 bg-slate-50 p-3 rounded text-xs">
             <h4 className="font-bold text-slate-900 mb-1.5">Recomendaciones Estratégicas para la Dirección Comercial:</h4>
             <ol className="list-decimal list-inside space-y-1 text-slate-700">
               <li>Implementar protocolo de cierre directo obligatorio mediante alternativas de facturación inmediata o reserva.</li>
@@ -434,7 +471,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               className="border border-slate-300 rounded-xl p-6 print:border-slate-400 print:rounded-none page-break-after space-y-6"
             >
               {/* Header */}
-              <div className="border-b border-slate-200 pb-3">
+              <div data-pdf-atom className="border-b border-slate-200 pb-3">
                 <div className="text-[10px] font-mono uppercase text-slate-500 font-bold">
                   Evaluación Mystery Shopper #{idx + 1} • {evalItem.identifier}
                 </div>
@@ -444,7 +481,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               </div>
 
               {/* Data Table */}
-              <table className="w-full text-xs border border-slate-200 text-left">
+              <table data-pdf-atom className="w-full text-xs border border-slate-200 text-left">
                 <thead className="bg-slate-100 font-bold text-slate-700">
                   <tr>
                     <th className="p-2 border-b border-slate-200">Tienda</th>
@@ -464,7 +501,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               </table>
 
               {/* Score & Summary */}
-              <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-2">
+              <div data-pdf-atom className="bg-slate-50 p-4 rounded border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-black text-lg text-slate-900">
                     PUNTUACIÓN: {evalItem.score}/100 ({evalItem.level})
@@ -479,7 +516,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               </div>
 
               {/* Desglose por Criterio */}
-              <div>
+              <div data-pdf-atom>
                 <h4 className="text-xs font-bold uppercase text-slate-700 mb-1">
                   Desglose por Criterio
                 </h4>
@@ -514,7 +551,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               </div>
 
               {/* Strengths & Critical Areas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div data-pdf-atom className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded">
                   <h5 className="font-bold text-emerald-900 mb-1">Fortalezas:</h5>
                   <ul className="list-disc list-inside space-y-0.5 text-slate-700">
@@ -535,17 +572,17 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
 
               {/* Transcripción */}
               <div className="border border-slate-200 rounded p-4 bg-slate-50/50 space-y-2 text-xs">
-                <div className="font-bold text-slate-900 border-b border-slate-200 pb-1">
+                <div data-pdf-atom className="font-bold text-slate-900 border-b border-slate-200 pb-1">
                   Transcripción Completa ({evalItem.recordingDate} | {evalItem.duration})
                 </div>
                 {evalItem.transcript.map((line, i) => (
-                  <div key={i} className="text-slate-800">
+                  <div key={i} data-pdf-atom className="text-slate-800">
                     <strong>{line.speaker}{line.speakerName ? ` (${line.speakerName})` : ''}:</strong>{' '}
                     <span>{line.text}</span>
                   </div>
                 ))}
                 {evalItem.ambientNotes && (
-                  <div className="mt-2 text-slate-500 italic pt-1 border-t border-slate-200">
+                  <div data-pdf-atom className="mt-2 text-slate-500 italic pt-1 border-t border-slate-200">
                     [Notas de ambiente: {evalItem.ambientNotes}]
                   </div>
                 )}
