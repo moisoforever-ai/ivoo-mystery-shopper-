@@ -91,34 +91,14 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
 
   // In-memory queue of loaded audio items
   const [loadedAudios, setLoadedAudios] = useState<LoadedAudioItem[]>(() => {
-    // Populate initial items from DEFAULT_DRIVE_FILES + existing evaluations
-    return DEFAULT_DRIVE_FILES.map((df) => {
-      const parsed = parseAudioFilename(df.name);
-      const existingEval = evaluations.find(
-        (e) =>
-          e.audioDriveId === df.id ||
-          e.storeName.toLowerCase().includes(parsed.city.toLowerCase()) &&
-            e.storeName.toLowerCase().includes(parsed.brand.toLowerCase())
-      );
-
-      return {
-        id: df.id,
-        name: df.name,
-        storeName: existingEval ? existingEval.storeName : parsed.storeName,
-        brand: parsed.brand,
-        city: parsed.city,
-        recordingDate: existingEval ? existingEval.recordingDate : parsed.recordingDate,
-        driveLink: df.webViewLink || `https://drive.google.com/drive/folders/${IVOO_DRIVE_FOLDER_ID}`,
-        status: existingEval ? 'audited' : 'ready',
-        score: existingEval?.score,
-        duration: existingEval?.duration || '12:40',
-      };
-    });
+    // Start empty — DEFAULT_DRIVE_FILES was decorative sample data with no real audio behind
+    // it. A user's own uploaded/attached files are the only legitimate way this list fills up.
+    return [];
   });
 
   // Active audio item being played/audited
   const [activeAudioId, setActiveAudioId] = useState<string>(() => {
-    return loadedAudios[0]?.id || '1-DAKA-MAT-1807';
+    return loadedAudios[0]?.id || '';
   });
 
   // In-app confirmation dialog (sandbox-safe, replaces window.confirm)
@@ -401,23 +381,18 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
     });
   };
 
-  // Run Gemini Audit on a single audio item
-  const auditSingleItem = async (item: LoadedAudioItem) => {
+  // Run Gemini Audit on a single audio item. Returns whether it succeeded, so batch runs can
+  // react to specific failure types (e.g. stop early on quota exhaustion) instead of blindly
+  // continuing through the rest of the queue.
+  const auditSingleItem = async (item: LoadedAudioItem): Promise<{ success: boolean; error?: string }> => {
     // Never fabricate an evaluation: without a real attached audio file there is nothing to
     // transcribe or audit. Mark it as needing attention instead of inventing a result.
     if (!item.file) {
+      const error = 'Falta adjuntar el archivo de audio real. Usa "📎 Adjuntar archivo" y vuelve a auditar.';
       setLoadedAudios((prev) =>
-        prev.map((a) =>
-          a.id === item.id
-            ? {
-                ...a,
-                status: 'error',
-                error: 'Falta adjuntar el archivo de audio real. Usa "📎 Adjuntar archivo" y vuelve a auditar.',
-              }
-            : a
-        )
+        prev.map((a) => (a.id === item.id ? { ...a, status: 'error', error } : a))
       );
-      return;
+      return { success: false, error };
     }
 
     setIsAuditingActive(true);
@@ -458,10 +433,17 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
         )
       );
 
-      // Create or update store evaluation
+      // Create or update store evaluation. IMPORTANT: look up the existing evaluation for THIS
+      // specific item, not the outer `currentEvaluation` (which only reflects whichever item is
+      // selected on screen). During a batch run, every item shares that same stale reference —
+      // using it here would silently merge unrelated stores' results under the wrong ID.
+      const existingEvalForItem = evaluations.find(
+        (e) => e.id === item.id || e.audioDriveId === item.id || e.storeName === item.storeName
+      );
+
       const updatedEval: StoreEvaluation = {
-        id: item.id.startsWith('local_') ? item.id : (currentEvaluation?.id || item.id),
-        identifier: (currentEvaluation?.identifier || item.brand.substring(0, 3) + '-' + item.city.substring(0, 3)).toUpperCase(),
+        id: item.id.startsWith('local_') ? item.id : (existingEvalForItem?.id || item.id),
+        identifier: (existingEvalForItem?.identifier || item.brand.substring(0, 3) + '-' + item.city.substring(0, 3)).toUpperCase(),
         storeName: result.storeName || item.storeName,
         brand: item.brand,
         city: result.city || item.city,
@@ -491,13 +473,14 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
 
       setSaveSuccessMsg(`¡Auditoría completada para ${item.storeName}! Calificación: ${result.score}/100`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
+      return { success: true };
     } catch (err: any) {
       console.error('Audit failed:', err);
+      const errorMsg = err.message || 'Error al auditar';
       setLoadedAudios((prev) =>
-        prev.map((a) =>
-          a.id === item.id ? { ...a, status: 'error', error: err.message || 'Error al auditar' } : a
-        )
+        prev.map((a) => (a.id === item.id ? { ...a, status: 'error', error: errorMsg } : a))
       );
+      return { success: false, error: errorMsg };
     } finally {
       setIsAuditingActive(false);
       setAuditProgressStage('');
@@ -533,14 +516,46 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
     if (withFile.length > 0) {
       setBatchProgress({ current: 0, total: withFile.length });
 
+      let stoppedEarlyForQuota = false;
+      let processedCount = 0;
+      const PACING_DELAY_MS = 2500; // Small gap between items to stay further under Gemini's per-minute rate limit
+
       for (let i = 0; i < withFile.length; i++) {
         const item = withFile[i];
         setBatchProgress({ current: i + 1, total: withFile.length });
         setActiveAudioId(item.id);
-        await auditSingleItem(item);
+        const result = await auditSingleItem(item);
+        processedCount++;
+
+        // If Gemini's quota is exhausted, every remaining item will fail the same way. Stop
+        // cleanly here instead of burning through the rest of the queue with more failures.
+        const isQuotaError =
+          !result.success &&
+          result.error &&
+          (result.error.toLowerCase().includes('cuota') || result.error.toLowerCase().includes('saturado'));
+
+        if (isQuotaError) {
+          stoppedEarlyForQuota = true;
+          break;
+        }
+
+        // Give Gemini's per-minute rate limit some breathing room between items.
+        if (i < withFile.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, PACING_DELAY_MS));
+        }
       }
 
       setBatchProgress(null);
+
+      if (stoppedEarlyForQuota) {
+        const remaining = withFile.length - processedCount;
+        setBatchWarningMsg(
+          `Se detuvo la auditoría automática: se agotó la cuota disponible de Gemini. ` +
+            `Se procesaron ${processedCount} de ${withFile.length} audios${remaining > 0 ? ` — quedan ${remaining} pendientes` : ''}. ` +
+            `Espera unos minutos (o revisa tu plan de la API) y vuelve a intentar con "Auditar Todo".`
+        );
+        setTimeout(() => setBatchWarningMsg(null), 12000);
+      }
     }
 
     if (withoutFile.length > 0) {
@@ -628,6 +643,15 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
 
   const pendingCount = loadedAudios.filter((a) => a.status === 'ready').length;
   const auditedCount = loadedAudios.filter((a) => a.status === 'audited').length;
+  const erroredCount = loadedAudios.filter((a) => a.status === 'error').length;
+
+  // Requeue every failed item (e.g. ones that hit Gemini's quota) back to "ready" so the next
+  // "Auditar Todo" click picks them up automatically — no need to retry one by one.
+  const handleRetryFailed = () => {
+    setLoadedAudios((prev) =>
+      prev.map((a) => (a.status === 'error' ? { ...a, status: 'ready', error: undefined } : a))
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -873,6 +897,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                 </h2>
                 <div className="text-[11px] text-slate-500 font-mono mt-0.5">
                   {auditedCount} auditadas • {pendingCount} pendientes
+                  {erroredCount > 0 && <span className="text-rose-600"> • {erroredCount} con error</span>}
                 </div>
               </div>
 
@@ -885,6 +910,18 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>Auditar ({pendingCount})</span>
+                  </button>
+                )}
+
+                {erroredCount > 0 && (
+                  <button
+                    onClick={handleRetryFailed}
+                    disabled={isAuditingActive}
+                    title="Vuelve a poner en la fila los audios que fallaron (ej. por cuota agotada) para intentarlos de nuevo"
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg text-xs border border-amber-200 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Reintentar ({erroredCount})</span>
                   </button>
                 )}
 
