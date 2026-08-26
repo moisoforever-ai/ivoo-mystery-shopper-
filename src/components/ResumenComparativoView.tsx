@@ -201,6 +201,21 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
     );
   };
 
+  if (evaluations.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto py-20 px-4 sm:px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto mb-5">
+          <BarChart className="w-7 h-7 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-900 mb-2">Todavía no hay nada que comparar</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          El panel comparativo entre tiendas va a aparecer aquí en cuanto tengas al menos una
+          evaluación completada.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-10">
       {/* 1. Interactive Consolidation & Filtering Controls */}
@@ -208,6 +223,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         <div>
           <div className="flex items-center gap-2 text-lime-400 font-mono text-xs uppercase font-bold tracking-wider mb-1">
             <Calendar className="w-4 h-4" />
+
             <span>Consolidado Mensual & Segmentación de Base de Datos</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white">
