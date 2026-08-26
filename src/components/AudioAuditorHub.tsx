@@ -991,6 +991,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                 const isActive = item.id === activeAudioId;
                 const isItemAudited = item.status === 'audited';
                 const isItemProcessing = item.status === 'processing';
+                const isItemError = item.status === 'error';
 
                 return (
                   <div
@@ -1059,6 +1060,10 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                           <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded animate-pulse">
                             Auditando...
                           </span>
+                        ) : isItemError ? (
+                          <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded">
+                            Error
+                          </span>
                         ) : (
                           <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
                             Pendiente
@@ -1066,6 +1071,14 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                         )}
                       </div>
                     </div>
+
+                    {/* Visible error message — so the reason is right there on screen, not
+                        just a count, and not something you'd need dev tools to find. */}
+                    {isItemError && item.error && (
+                      <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-800 leading-snug">
+                        {item.error}
+                      </div>
+                    )}
 
                     {/* Quick Item Actions Bar */}
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[11px]">

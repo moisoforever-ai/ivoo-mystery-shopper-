@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, createPartFromUri } from "@google/genai";
 import dotenv from "dotenv";
 import { friendlyGeminiErrorMessage } from "./server/geminiErrors";
 
@@ -245,17 +245,19 @@ app.post("/api/gemini/process-session", async (req, res) => {
       });
     }
 
-    // Concatenate all chunks into one complete buffer
+    // Concatenate all chunks into one complete buffer. IMPORTANT: we no longer convert this to
+    // a base64 string here — that string was ~33% larger than the buffer itself, and holding
+    // both in memory at once (plus the JSON-serialized request) is what was crashing the
+    // server on longer recordings. We now hand the raw buffer straight to Gemini's Files API.
     const validBuffers = session.chunks as Buffer[];
     const completeBuffer = Buffer.concat(validBuffers);
-    const audioBase64 = completeBuffer.toString("base64");
 
     // Clean up session from memory
     uploadSessions.delete(sessionId);
 
     // Call Gemini with full audio data
     const auditResult = await executeGeminiAudioAudit({
-      audioBase64,
+      audioBuffer: completeBuffer,
       mimeType: session.mimeType,
       storeName: session.storeName,
       city: session.city,
@@ -278,14 +280,16 @@ app.post("/api/gemini/process-session", async (req, res) => {
 
 // Helper function for Gemini audio transcription and audit
 async function executeGeminiAudioAudit(params: {
-  audioBase64: string;
+  audioBuffer: Buffer;
   mimeType: string;
   storeName: string;
   city: string;
   recordingDate: string;
   additionalContext: string;
 }) {
-  const { audioBase64, mimeType, storeName, city, recordingDate, additionalContext } = params;
+  const { audioBuffer, mimeType, storeName, city, recordingDate, additionalContext } = params;
+
+  let uploadedFileName: string | undefined;
 
   try {
     let normalizedMime = mimeType || "audio/mp4";
@@ -297,6 +301,43 @@ async function executeGeminiAudioAudit(params: {
     else if (lower.includes("webm")) normalizedMime = "audio/webm";
     else if (lower.includes("flac")) normalizedMime = "audio/flac";
     else normalizedMime = "audio/mp4";
+
+    const client = getGeminiClient();
+    if (!client) {
+      throw new Error("AUTH_NO_KEY");
+    }
+
+    // IMPORTANT: upload the audio through Gemini's Files API instead of embedding it inline
+    // as a base64 string in the request body. Building and holding a full base64 string (33%
+    // larger than the raw audio) plus the JSON-serialized request in memory at the same time is
+    // what was causing the server to run out of RAM and crash on longer recordings — this
+    // avoids that altogether by only ever holding the raw buffer, and lets Gemini's own
+    // infrastructure hold the audio instead of our 512MB free-tier instance.
+    console.log(`[Gemini Engine] Subiendo audio (${normalizedMime}, ${Math.round(audioBuffer.length / 1024)} KB) a Gemini Files API para ${storeName}...`);
+
+    const audioBlob = new Blob([audioBuffer], { type: normalizedMime });
+    let uploadedFile = await client.files.upload({
+      file: audioBlob,
+      config: { mimeType: normalizedMime },
+    });
+    uploadedFileName = uploadedFile.name;
+
+    // Gemini processes larger audio files asynchronously — poll until it's ready to use.
+    const POLL_INTERVAL_MS = 2000;
+    const MAX_POLL_MS = 90 * 1000;
+    let waited = 0;
+    while (uploadedFile.state === "PROCESSING" && waited < MAX_POLL_MS) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      waited += POLL_INTERVAL_MS;
+      uploadedFile = await client.files.get({ name: uploadedFile.name! });
+    }
+
+    if (uploadedFile.state === "FAILED") {
+      throw new Error("Gemini no pudo procesar el archivo de audio subido (falló en su lado).");
+    }
+    if (uploadedFile.state !== "ACTIVE") {
+      throw new Error("El archivo de audio tardó demasiado en quedar listo en Gemini. Intenta de nuevo.");
+    }
 
     const systemPrompt = `Eres el Auditor Senior de Máxima Precisión en Evaluaciones Mystery Shopper para retail de tecnología y electrodomésticos en Venezuela (especialista en la metodología oficial IVOO y comparativas DAKA, DAMASCO, MULTIMAX).
 
@@ -332,18 +373,13 @@ ${additionalContext ? `Contexto adicional: ${additionalContext}` : ""}
 
 Escucha el audio adjunto en su totalidad, transcribe todos los turnos de diálogo verbatim con marcas de tiempo, extrae la información real (vendedor, productos, precios, financiamiento) y califica los 9 criterios técnicos según lo ocurrido en la grabación.`;
 
-    const audioPart = {
-      inlineData: {
-        mimeType: normalizedMime,
-        data: audioBase64,
-      },
-    };
+    const audioPart = createPartFromUri(uploadedFile.uri!, uploadedFile.mimeType!);
 
     const textPart = {
       text: promptText,
     };
 
-    console.log(`[Gemini Engine] Enviando audio (${normalizedMime}, ${Math.round(audioBase64.length / 1024)} KB base64) para análisis verbatim de ${storeName}...`);
+    console.log(`[Gemini Engine] Audio listo (ACTIVE) para ${storeName}, solicitando transcripción y auditoría...`);
 
     const response = await generateContentWithFallback({
       preferredModel: "gemini-3.7-flash",
@@ -462,6 +498,18 @@ Escucha el audio adjunto en su totalidad, transcribe todos los turnos de diálog
   } catch (err: any) {
     console.error(`[Gemini Error] Falló el análisis de audio para ${storeName}:`, err?.message || err);
     throw new Error(friendlyGeminiErrorMessage(err));
+  } finally {
+    // Best-effort cleanup: the uploaded audio isn't needed once this request is done (it also
+    // auto-expires on Gemini's side after 48h regardless), so free it up right away instead of
+    // leaving it to pile up.
+    if (uploadedFileName) {
+      try {
+        const client = getGeminiClient();
+        await client?.files.delete({ name: uploadedFileName });
+      } catch (cleanupErr) {
+        console.warn(`[Gemini Engine] No se pudo borrar el archivo temporal ${uploadedFileName}:`, cleanupErr);
+      }
+    }
   }
 }
 
@@ -486,7 +534,7 @@ app.post("/api/gemini/transcribe-audio", async (req, res) => {
       : audioBase64;
 
     const result = await executeGeminiAudioAudit({
-      audioBase64: cleanBase64,
+      audioBuffer: Buffer.from(cleanBase64, "base64"),
       mimeType,
       storeName,
       city,
