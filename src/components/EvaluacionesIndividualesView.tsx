@@ -41,7 +41,7 @@ interface EvaluacionesIndividualesViewProps {
   onSelectStore: (storeId: string) => void;
   onUpdateEvaluation: (updated: StoreEvaluation) => void;
   onDeleteEvaluation?: (storeId: string) => void;
-  onGoToAudios?: (storeId: string) => void;
+  onGoToAudios?: (storeId?: string) => void;
 }
 
 export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesViewProps> = ({
@@ -163,6 +163,29 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
       setToastMessage(null);
     }, 3000);
   };
+
+  if (evaluations.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto py-20 px-4 sm:px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto mb-5">
+          <FileAudio className="w-7 h-7 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-900 mb-2">Todavía no hay evaluaciones</h2>
+        <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
+          Cuando audites tu primera grabación en la pestaña "Audios", el resultado va a aparecer
+          aquí con su desglose completo de los 9 criterios.
+        </p>
+        {onGoToAudios && (
+          <button
+            onClick={() => onGoToAudios()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition-colors"
+          >
+            Ir a Audios
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 space-y-8">
