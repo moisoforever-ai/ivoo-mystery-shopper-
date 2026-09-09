@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StoreEvaluation } from '../types';
 import {
   getStatusColorClasses,
@@ -16,7 +16,6 @@ import {
   User,
   Store,
   CheckCircle,
-  XCircle,
   Lightbulb,
   FileAudio,
   MessageSquare,
@@ -94,6 +93,22 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
 
   const currentIndex = evaluations.findIndex((e) => e.id === selectedStoreId);
   const currentEval = evaluations[currentIndex !== -1 ? currentIndex : 0];
+
+  const [freelancerNotes, setFreelancerNotes] = useState('');
+  const [freelancerNotesSaved, setFreelancerNotesSaved] = useState(false);
+
+  // Keep the observations box in sync when switching between evaluations
+  useEffect(() => {
+    setFreelancerNotes(currentEval?.freelancerObservations || '');
+  }, [currentEval?.id]);
+
+  const handleSaveFreelancerNotes = () => {
+    if (!currentEval) return;
+    if ((currentEval.freelancerObservations || '') === freelancerNotes) return;
+    onUpdateEvaluation({ ...currentEval, freelancerObservations: freelancerNotes });
+    setFreelancerNotesSaved(true);
+    setTimeout(() => setFreelancerNotesSaved(false), 2000);
+  };
 
   const handlePrev = () => {
     if (currentIndex > 0) {
@@ -507,32 +522,53 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
             );
           })()}
 
-          {/* 3. General Score & Closure Banner */}
+          {/* 3. General Score Banner */}
           <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="text-3xl sm:text-4xl font-black text-slate-900">
-                  {currentEval.score}
-                  <span className="text-lg font-semibold text-slate-400">/100</span>
-                </div>
-                <span
-                  className={`text-sm font-bold px-3 py-1 rounded-full ${getLevelBadgeClasses(
-                    currentEval.level
-                  )}`}
-                >
-                  {currentEval.level}
-                </span>
+            <div className="flex items-center gap-3">
+              <div className="text-3xl sm:text-4xl font-black text-slate-900">
+                {currentEval.score}
+                <span className="text-lg font-semibold text-slate-400">/100</span>
               </div>
-
-              <div className="bg-rose-100 border border-rose-300 text-rose-900 font-black text-xs sm:text-sm uppercase tracking-widest px-3.5 py-1.5 rounded-lg shadow-2xs flex items-center gap-1.5">
-                <XCircle className="w-4 h-4 text-rose-600" />
-                VENTA NO CERRADA
-              </div>
+              <span
+                className={`text-sm font-bold px-3 py-1 rounded-full ${getLevelBadgeClasses(
+                  currentEval.level
+                )}`}
+              >
+                {currentEval.level}
+              </span>
             </div>
 
             <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal bg-white p-4 rounded-lg border border-slate-200/80">
               {currentEval.narrativeSummary}
             </p>
+          </div>
+
+          {/* 3.5 Freelancer's own observations about the visit — directly editable here, no
+              need to open the edit modal for something the shopper will fill in every time. */}
+          <div className="bg-white rounded-xl p-5 border border-lime-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <MessageSquare className="w-4 h-4 text-lime-600" />
+                <span>Observaciones del Freelance sobre el Recorrido</span>
+              </label>
+              {freelancerNotesSaved && (
+                <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  Guardado
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Espacio para quien hizo la visita: contexto, detalles o comentarios que no queden claros solo con el audio.
+            </p>
+            <textarea
+              value={freelancerNotes}
+              onChange={(e) => setFreelancerNotes(e.target.value)}
+              onBlur={handleSaveFreelancerNotes}
+              placeholder="Ej: La tienda estaba muy concurrida, tuve que esperar unos minutos antes de que me atendieran..."
+              rows={3}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-400 focus:outline-hidden text-sm text-slate-800 leading-relaxed"
+            />
           </div>
 
           {/* 4. Criteria Breakdown */}

@@ -44,6 +44,7 @@ export const EditEvaluationModal: React.FC<EditEvaluationModalProps> = ({
   const [productEvaluated, setProductEvaluated] = useState(evaluation.productEvaluated);
   const [audioUrl, setAudioUrl] = useState(evaluation.audioUrl || '');
   const [ambientNotes, setAmbientNotes] = useState(evaluation.ambientNotes || '');
+  const [freelancerObservations, setFreelancerObservations] = useState(evaluation.freelancerObservations || '');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   // Criteria Breakdown & Scores
@@ -361,6 +362,20 @@ export const EditEvaluationModal: React.FC<EditEvaluationModalProps> = ({
                   value={ambientNotes}
                   onChange={(e) => setAmbientNotes(e.target.value)}
                   placeholder="Ej: Tienda con poco flujo. Vendedores agrupados en el área de televisores."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-400 focus:outline-hidden text-slate-800 text-xs"
+                />
+              </div>
+
+              {/* Freelancer Observations */}
+              <div className="border-t border-slate-200 pt-3">
+                <label className="block font-bold text-slate-700 mb-1">
+                  Observaciones del Freelance sobre el Recorrido
+                </label>
+                <textarea
+                  rows={3}
+                  value={freelancerObservations}
+                  onChange={(e) => setFreelancerObservations(e.target.value)}
+                  placeholder="Ej: La tienda estaba muy concurrida, tuve que esperar unos minutos antes de que me atendieran..."
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-lime-400 focus:outline-hidden text-slate-800 text-xs"
                 />
               </div>

@@ -51,6 +51,7 @@ export interface StoreEvaluation {
   recommendations: string[];
   transcript: TranscriptLine[];
   ambientNotes?: string;
+  freelancerObservations?: string;
   audioUrl?: string;
   audioDriveId?: string;
   verificationStatus?: VerificationStatus;

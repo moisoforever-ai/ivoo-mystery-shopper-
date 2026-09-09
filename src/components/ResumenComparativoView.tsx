@@ -508,7 +508,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
       </div>
 
       {/* 4. Key Metrics Summary Cards for Filtered Set */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <span className="text-xs uppercase font-semibold text-slate-500">
             Promedio Segmentado
@@ -519,17 +519,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
           </div>
           <span className={`inline-block mt-2 text-xs font-bold px-2 py-0.5 rounded ${getLevelBadgeClasses(stats.level as any)}`}>
             Nivel: {stats.level}
-          </span>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-rose-200 shadow-xs bg-rose-50/40">
-          <span className="text-xs uppercase font-semibold text-rose-700">Tasa de Cierre</span>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-3xl font-black text-rose-700">{stats.closedPercentage.toFixed(1)}%</span>
-            <span className="text-xs text-rose-600 font-semibold">({stats.closedCount} / {stats.total})</span>
-          </div>
-          <span className="inline-block mt-2 text-xs font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded">
-            {stats.closedCount === 0 ? 'Crítico transversal' : `${stats.closedCount} venta(s) cerrada(s)`}
           </span>
         </div>
 
@@ -585,7 +574,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                 <th className="py-3.5 px-4">Vendedor</th>
                 <th className="py-3.5 px-4 text-center">Punt.</th>
                 <th className="py-3.5 px-4 text-center">Nivel</th>
-                <th className="py-3.5 px-4 text-center">Venta</th>
                 <th className="py-3.5 px-4 text-right">Detalle</th>
               </tr>
             </thead>
@@ -623,17 +611,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                       )}`}
                     >
                       {item.level}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded border ${
-                        item.saleClosed
-                          ? 'text-emerald-800 bg-emerald-50 border-emerald-300'
-                          : 'text-rose-700 bg-rose-50 border-rose-200'
-                      }`}
-                    >
-                      {item.saleClosed ? 'Cerrada' : 'No cerrada'}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 text-right">
@@ -785,12 +762,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <span>Patrones Críticos y Brechas Identificadas ({stats.periodText})</span>
           </div>
           <ul className="space-y-3.5 text-xs sm:text-sm text-slate-700 leading-relaxed">
-            <li className="flex items-start gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
-              <div>
-                <strong>Cierre comercial deficitario ({stats.closedPercentage.toFixed(0)}% de éxito):</strong> En {stats.total - stats.closedCount} de las {stats.total} visitas evaluadas, el vendedor omitió formular un intento explícito de cierre o apartado.
-              </div>
-            </li>
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
               <div>

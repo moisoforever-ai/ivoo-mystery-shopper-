@@ -193,8 +193,6 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
   };
 
   const overallAvg = evaluations.reduce((sum, e) => sum + e.score, 0) / (evaluations.length || 1);
-  const closedCount = evaluations.filter((e) => e.saleClosed).length;
-  const closedPercent = Math.round((closedCount / (evaluations.length || 1)) * 100);
   const contactCount = evaluations.filter((e) => e.contactCaptured).length;
   const contactPercent = Math.round((contactCount / (evaluations.length || 1)) * 100);
   const dates = Array.from(new Set(evaluations.map((e) => e.recordingDate).filter(Boolean)));
@@ -309,16 +307,11 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           </div>
 
           {/* Key Totals Box */}
-          <div className="mt-8 grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
+          <div className="mt-8 grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 text-center">
             <div>
               <div className="text-xs text-slate-500 uppercase font-semibold">Promedio General</div>
               <div className="text-2xl font-black text-slate-900 mt-0.5">{overallAvg.toFixed(1)} / 100</div>
               <div className="text-[11px] text-amber-800 font-bold">Nivel {overallAvg >= 75 ? 'Bueno' : overallAvg >= 50 ? 'Regular' : 'Deficiente'}</div>
-            </div>
-            <div>
-              <div className="text-xs text-slate-500 uppercase font-semibold">Tasa de Cierre</div>
-              <div className="text-2xl font-black text-rose-700 mt-0.5">{closedPercent}% ({closedCount} / {evaluations.length})</div>
-              <div className="text-[11px] text-rose-800 font-bold">{closedCount === 0 ? 'Ninguna venta cerrada' : `${closedCount} cerradas`}</div>
             </div>
             <div>
               <div className="text-xs text-slate-500 uppercase font-semibold">Captura de Contacto</div>
@@ -350,7 +343,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               Resumen Comparativo
             </h2>
             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              Durante el período de {periodText} se completaron {evaluations.length} visitas de evaluación Mystery Shopper en tiendas {brandsText} ubicadas en las plazas de {cities.join(', ')}. La auditoría registró una puntuación media global de <strong>{overallAvg.toFixed(1)}/100</strong>, con una <strong>tasa de cierre comercial del {closedPercent}%</strong> ({closedCount} de {evaluations.length} ventas cerradas) y una <strong>captura de datos de contacto del {contactPercent}%</strong> ({contactCount} de {evaluations.length} visitas), reflejando oportunidades clave en técnicas de cierre directo y prospección comercial.
+              Durante el período de {periodText} se completaron {evaluations.length} visitas de evaluación Mystery Shopper en tiendas {brandsText} ubicadas en las plazas de {cities.join(', ')}. La auditoría registró una puntuación media global de <strong>{overallAvg.toFixed(1)}/100</strong>, con una <strong>captura de datos de contacto del {contactPercent}%</strong> ({contactCount} de {evaluations.length} visitas), reflejando oportunidades clave en prospección comercial.
             </p>
           </div>
 
@@ -365,7 +358,6 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
                   <th className="py-2 px-2 border-b border-slate-300">Vendedor</th>
                   <th className="py-2 px-2 border-b border-slate-300 text-center">Punt.</th>
                   <th className="py-2 px-2 border-b border-slate-300 text-center">Nivel</th>
-                  <th className="py-2 px-2 border-b border-slate-300 text-center">Venta</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -376,11 +368,6 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
                     <td className="py-1.5 px-2">{e.seller}</td>
                     <td className="py-1.5 px-2 text-center font-mono font-bold">{e.score}</td>
                     <td className="py-1.5 px-2 text-center">{e.level}</td>
-                    <td className="py-1.5 px-2 text-center">
-                      <span className={`font-semibold ${e.saleClosed ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {e.saleClosed ? 'Cerrada' : 'No cerrada'}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -432,7 +419,6 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
             <div className="border border-rose-200 bg-rose-50/50 p-3 rounded">
               <h4 className="font-bold text-rose-900 mb-2">Patrones Críticos y Oportunidades:</h4>
               <ul className="space-y-1 text-slate-700 list-disc list-inside leading-tight">
-                <li>Cierre comercial concretado en solo el {closedPercent}% de las visitas ({closedCount} de {evaluations.length}).</li>
                 <li>Captura de datos de contacto efectuada en {contactCount} de {evaluations.length} interacciones ({contactPercent}%).</li>
                 <li>Sondeo de necesidades enfocado primariamente al rango de precio.</li>
                 <li>Brecha de rendimiento entre la tienda superior ({topEval?.storeName} - {topEval?.score} pts) y la inferior ({bottomEval?.storeName} - {bottomEval?.score} pts).</li>
@@ -506,14 +492,19 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
                   <span className="font-black text-lg text-slate-900">
                     PUNTUACIÓN: {evalItem.score}/100 ({evalItem.level})
                   </span>
-                  <span className="text-xs font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
-                    VENTA NO CERRADA
-                  </span>
                 </div>
                 <p className="text-xs text-slate-700 leading-relaxed">
                   {evalItem.narrativeSummary}
                 </p>
               </div>
+
+              {/* Freelancer's own observations, if provided */}
+              {evalItem.freelancerObservations && (
+                <div data-pdf-atom className="p-3 bg-lime-50/60 border border-lime-200 rounded text-xs">
+                  <h4 className="font-bold text-slate-900 mb-1">Observaciones del Freelance sobre el Recorrido:</h4>
+                  <p className="text-slate-700 leading-relaxed">{evalItem.freelancerObservations}</p>
+                </div>
+              )}
 
               {/* Desglose por Criterio */}
               <div data-pdf-atom>
