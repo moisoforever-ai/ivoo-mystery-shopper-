@@ -6,6 +6,7 @@ import {
   getCriterionStatus,
   getStatusColorClasses,
   getLevelBadgeClasses,
+  getLevelDisplayName,
 } from '../data/criteria';
 import {
   Printer,
@@ -311,7 +312,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
             <div>
               <div className="text-xs text-slate-500 uppercase font-semibold">Promedio General</div>
               <div className="text-2xl font-black text-slate-900 mt-0.5">{overallAvg.toFixed(1)} / 100</div>
-              <div className="text-[11px] text-amber-800 font-bold">Nivel {overallAvg >= 75 ? 'Bueno' : overallAvg >= 50 ? 'Regular' : 'Deficiente'}</div>
+              <div className="text-[11px] text-amber-800 font-bold">Nivel {overallAvg >= 90 ? 'Asesor Smart' : overallAvg >= 80 ? 'Sólido' : overallAvg >= 65 ? 'En Desarrollo' : overallAvg >= 50 ? 'Insuficiente' : 'Crítico'}</div>
             </div>
             <div>
               <div className="text-xs text-slate-500 uppercase font-semibold">Captura de Contacto</div>
@@ -329,7 +330,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               {evaluations.map((e, idx) => (
                 <div key={e.id} className="p-2 flex justify-between items-center">
                   <span><strong>#{idx + 1}</strong> {e.storeName} — {e.seller}</span>
-                  <span className="font-mono font-bold">{e.score} pts ({e.level})</span>
+                  <span className="font-mono font-bold">{e.score} pts ({getLevelDisplayName(e.level)})</span>
                 </div>
               ))}
             </div>
@@ -367,7 +368,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
                     <td className="py-1.5 px-2 font-bold">{e.storeName}</td>
                     <td className="py-1.5 px-2">{e.seller}</td>
                     <td className="py-1.5 px-2 text-center font-mono font-bold">{e.score}</td>
-                    <td className="py-1.5 px-2 text-center">{e.level}</td>
+                    <td className="py-1.5 px-2 text-center">{getLevelDisplayName(e.level)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -376,7 +377,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
 
           {/* Criteria Matrix Table */}
           <div data-pdf-atom>
-            <h3 className="text-sm font-bold text-slate-900 mb-2">Comparativo por Criterio (9 Criterios)</h3>
+            <h3 className="text-sm font-bold text-slate-900 mb-2">Comparativo por Dimensión (8 Dimensiones)</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-center text-[10px] border border-slate-300">
                 <thead className="bg-slate-900 text-white">
@@ -490,7 +491,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               <div data-pdf-atom className="bg-slate-50 p-4 rounded border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-black text-lg text-slate-900">
-                    PUNTUACIÓN: {evalItem.score}/100 ({evalItem.level})
+                    PUNTUACIÓN: {evalItem.score}/100 ({getLevelDisplayName(evalItem.level)})
                   </span>
                 </div>
                 <p className="text-xs text-slate-700 leading-relaxed">

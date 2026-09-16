@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StoreEvaluation, CriterionScore } from '../types';
-import { IVOO_CRITERIA, getCriterionStatus, getStatusColorClasses, getLevelBadgeClasses } from '../data/criteria';
+import { IVOO_CRITERIA, getCriterionStatus, getStatusColorClasses, getLevelBadgeClasses, getOverallLevel, getLevelDisplayName } from '../data/criteria';
 import {
   X,
   Calendar,
@@ -59,8 +59,7 @@ export const EditEvaluationModal: React.FC<EditEvaluationModalProps> = ({
 
   // Compute live total score
   const totalScore = criteriaBreakdown.reduce((sum, c) => sum + (Number(c.score) || 0), 0);
-  const computedLevel =
-    totalScore >= 75 ? 'Bueno' : totalScore >= 50 ? 'Regular' : 'Deficiente';
+  const computedLevel = getOverallLevel(totalScore, criteriaBreakdown, evaluation.flags);
 
   const handleScoreChange = (criterionId: string, newScore: number) => {
     setCriteriaBreakdown((prev) =>
@@ -165,7 +164,7 @@ export const EditEvaluationModal: React.FC<EditEvaluationModalProps> = ({
             <div className="text-right hidden sm:block">
               <div className="text-xs text-slate-400">Puntaje Recalculado</div>
               <div className="text-sm font-black text-lime-400">
-                {totalScore} / 100 ({computedLevel})
+                {totalScore} / 100 ({getLevelDisplayName(computedLevel)})
               </div>
             </div>
             <button
@@ -202,7 +201,7 @@ export const EditEvaluationModal: React.FC<EditEvaluationModalProps> = ({
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>2. Calificación por 9 Criterios ({totalScore} pts)</span>
+            <span>2. Calificación por 8 Dimensiones ({totalScore} pts)</span>
           </button>
 
           <button
@@ -391,7 +390,7 @@ export const EditEvaluationModal: React.FC<EditEvaluationModalProps> = ({
                   <div className="text-2xl font-black text-lime-400">{totalScore} / 100</div>
                 </div>
                 <div className={`text-xs font-bold px-3 py-1 rounded-full ${getLevelBadgeClasses(computedLevel)}`}>
-                  Nivel: {computedLevel}
+                  Nivel: {getLevelDisplayName(computedLevel)}
                 </div>
               </div>
 

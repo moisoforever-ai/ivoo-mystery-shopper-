@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { EVALUATIONS_DATA } from '../data/evaluationsData';
-import { StoreEvaluation, BrandCategory } from '../types';
+import { StoreEvaluation, BrandCategory, EvaluationLevel } from '../types';
 import {
   IVOO_CRITERIA,
   getCriterionStatus,
   getStatusColorClasses,
   getLevelBadgeClasses,
+  getOverallLevel,
+  getLevelDisplayName,
 } from '../data/criteria';
 import {
   getMonthlyConsolidatedSummaries,
@@ -81,12 +83,15 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
     const contactCount = filteredEvaluations.filter((e) => e.contactCaptured).length;
     const contactPercentage = (contactCount / total) * 100;
 
-    const goodCount = filteredEvaluations.filter((e) => e.score >= 75).length;
-    const regularCount = filteredEvaluations.filter((e) => e.score >= 50 && e.score < 75).length;
-    const deficientCount = filteredEvaluations.filter((e) => e.score < 50).length;
+    const smartCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'SMART').length;
+    const solidoCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'SOLIDO').length;
+    const enDesarrolloCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'EN_DESARROLLO').length;
+    const insuficienteCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'INSUFICIENTE').length;
+    const criticoCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'CRITICO').length;
+    const deficientCount = insuficienteCount + criticoCount;
     const deficientPercentage = (deficientCount / total) * 100;
 
-    const level = overallAvg >= 75 ? 'Bueno' : overallAvg >= 50 ? 'Regular' : 'Deficiente';
+    const level: EvaluationLevel = overallAvg >= 90 ? 'SMART' : overallAvg >= 80 ? 'SOLIDO' : overallAvg >= 65 ? 'EN_DESARROLLO' : overallAvg >= 50 ? 'INSUFICIENTE' : 'CRITICO';
 
     // IVOO vs Competitor breakdown within filtered dataset
     const ivooItems = filteredEvaluations.filter((e) => e.brandCategory === 'IVOO' || e.brand === 'IVOO');
@@ -142,8 +147,11 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
       closedPercentage,
       contactCount,
       contactPercentage,
-      goodCount,
-      regularCount,
+      smartCount,
+      solidoCount,
+      enDesarrolloCount,
+      insuficienteCount,
+      criticoCount,
       deficientCount,
       deficientPercentage,
       ivooItems,
@@ -416,7 +424,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
               Matriz Comparativa de Criterios: IVOO vs Red Competidora
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Cálculo de brecha diferencial (Delta = Promedio IVOO - Promedio Competencia) por cada uno de los 9 criterios comerciales
+              Cálculo de brecha diferencial (Delta = Promedio IVOO - Promedio Competencia) por cada una de las 8 dimensiones comerciales
             </p>
           </div>
 
@@ -517,8 +525,8 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <span className="text-3xl font-black text-slate-900">{stats.overallAvg.toFixed(1)}</span>
             <span className="text-xs text-slate-400 font-semibold">/ 100</span>
           </div>
-          <span className={`inline-block mt-2 text-xs font-bold px-2 py-0.5 rounded ${getLevelBadgeClasses(stats.level as any)}`}>
-            Nivel: {stats.level}
+          <span className={`inline-block mt-2 text-xs font-bold px-2 py-0.5 rounded ${getLevelBadgeClasses(stats.level)}`}>
+            Nivel: {getLevelDisplayName(stats.level)}
           </span>
         </div>
 
@@ -535,13 +543,15 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
 
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
           <span className="text-xs uppercase font-semibold text-slate-500">Distribución de Niveles</span>
-          <div className="mt-2 flex items-center gap-1.5 text-xs font-bold flex-wrap">
-            <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">{stats.goodCount} Bueno</span>
-            <span className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">{stats.regularCount} Regular</span>
-            <span className="text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded">{stats.deficientCount} Deficiente</span>
+          <div className="mt-2 flex items-center gap-1 text-[11px] font-bold flex-wrap">
+            <span className="text-lime-900 bg-lime-100 px-1.5 py-0.5 rounded">{stats.smartCount} Smart</span>
+            <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">{stats.solidoCount} Sólido</span>
+            <span className="text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">{stats.enDesarrolloCount} En Desarrollo</span>
+            <span className="text-orange-800 bg-orange-100 px-1.5 py-0.5 rounded">{stats.insuficienteCount} Insuf.</span>
+            <span className="text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded">{stats.criticoCount} Crítico</span>
           </div>
           <span className="inline-block mt-2 text-xs text-slate-400 font-medium">
-            {stats.deficientPercentage.toFixed(1)}% en rango deficiente
+            {stats.deficientPercentage.toFixed(1)}% en rango insuficiente o crítico
           </span>
         </div>
       </div>
@@ -610,7 +620,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                         item.level
                       )}`}
                     >
-                      {item.level}
+                      {getLevelDisplayName(item.level)}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 text-right">
@@ -632,7 +642,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         </div>
       </div>
 
-      {/* 6. Full Criteria Matrix (Tiendas x 9 Criterios) */}
+      {/* 6. Full Criteria Matrix (Tiendas x 8 Dimensiones) */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-200 bg-slate-50">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -641,7 +651,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                 Matriz General por Criterio ({stats.periodText})
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Desglose cuantitativo de puntuación por cada uno de los 9 criterios metodológicos
+                Desglose cuantitativo de puntuación por cada una de las 8 dimensiones metodológicas
               </p>
             </div>
 

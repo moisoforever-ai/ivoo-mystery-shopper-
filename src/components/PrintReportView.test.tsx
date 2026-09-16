@@ -13,7 +13,7 @@ function makeEvaluation(id: string, storeName: string): StoreEvaluation {
     recordingDate: '08 de Julio 2026',
     duration: '10:00',
     score: 80,
-    level: 'Bueno',
+    level: 'SMART',
     saleClosed: true,
     contactCaptured: true,
     productEvaluated: 'Smart TV',

@@ -3,6 +3,7 @@ import { StoreEvaluation } from '../types';
 import {
   getStatusColorClasses,
   getLevelBadgeClasses,
+  getLevelDisplayName,
 } from '../data/criteria';
 import { EditEvaluationModal } from './EditEvaluationModal';
 import { regradeTranscriptWithGemini } from '../services/geminiAudioService';
@@ -188,7 +189,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
         <h2 className="text-xl font-extrabold text-slate-900 mb-2">Todavía no hay evaluaciones</h2>
         <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
           Cuando audites tu primera grabación en la pestaña "Audios", el resultado va a aparecer
-          aquí con su desglose completo de los 9 criterios.
+          aquí con su desglose completo de las 8 dimensiones.
         </p>
         {onGoToAudios && (
           <button
@@ -212,7 +213,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
               Evaluaciones Individuales por Tienda
             </h2>
             <p className="text-xs text-slate-500">
-              Explora las {evaluations.length} evaluaciones con desglose de 9 criterios, transcripción y reproductor de audio
+              Explora las {evaluations.length} evaluaciones con desglose de 8 dimensiones, transcripción y reproductor de audio
             </p>
           </div>
 
@@ -534,7 +535,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
                   currentEval.level
                 )}`}
               >
-                {currentEval.level}
+                {getLevelDisplayName(currentEval.level)}
               </span>
             </div>
 
@@ -578,7 +579,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
                 <Store className="w-4 h-4 text-lime-600" />
                 Desglose por Criterio (Metodología IVOO)
               </h4>
-              <span className="text-xs text-slate-500 font-medium">9 Criterios evaluados</span>
+              <span className="text-xs text-slate-500 font-medium">8 Dimensiones evaluadas</span>
             </div>
 
             <div className="overflow-x-auto border border-slate-200 rounded-xl">
@@ -628,7 +629,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
                       100
                     </td>
                     <td className="py-3.5 px-4 text-xs font-mono text-slate-300">
-                      <strong>Total: {currentEval.score} / 100 puntos ({currentEval.score}%)</strong> — Nivel: {currentEval.level}
+                      <strong>Total: {currentEval.score} / 100 puntos ({currentEval.score}%)</strong> — Nivel: {getLevelDisplayName(currentEval.level)}
                     </td>
                   </tr>
                 </tfoot>
@@ -698,7 +699,7 @@ export const EvaluacionesIndividualesView: React.FC<EvaluacionesIndividualesView
                   onClick={handleReauditWithGemini}
                   disabled={isReauditing}
                   className="px-3 py-1.5 rounded-lg bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-                  title="Calcular de nuevo los 9 criterios y puntaje con Gemini 3.7 Flash"
+                  title="Calcular de nuevo las 8 dimensiones y puntaje con Gemini 3.7 Flash"
                 >
                   {isReauditing ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-950" />

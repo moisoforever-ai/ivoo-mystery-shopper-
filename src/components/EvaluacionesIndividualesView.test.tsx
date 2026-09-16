@@ -13,7 +13,7 @@ function makeEvaluation(): StoreEvaluation {
     recordingDate: '08 de Julio 2026',
     duration: '10:00',
     score: 80,
-    level: 'Bueno',
+    level: 'SMART',
     saleClosed: false,
     contactCaptured: true,
     productEvaluated: 'Smart TV',

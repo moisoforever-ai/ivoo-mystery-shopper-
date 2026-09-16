@@ -8,7 +8,7 @@ import {
   DriveFileItem,
   BrandType,
 } from '../types';
-import { IVOO_CRITERIA, getCriterionStatus, getStatusColorClasses, getLevelBadgeClasses } from '../data/criteria';
+import { IVOO_CRITERIA, getCriterionStatus, getStatusColorClasses, getLevelBadgeClasses, getOverallLevel, getLevelDisplayName } from '../data/criteria';
 import { transcribeAndAuditAudioWithGemini, regradeTranscriptWithGemini } from '../services/geminiAudioService';
 import { parseAudioFilename, normalizeEvaluation } from '../utils/evaluationHelpers';
 import { IVOO_DRIVE_FOLDER_ID, DEFAULT_DRIVE_FILES } from '../services/googleDriveService';
@@ -707,7 +707,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-                Adjunta todas tus notas de voz (WhatsApp, grabaciones de celular o audios de Drive). El sistema las transcribe verbatim y evalúa los 9 criterios comerciales.
+                Adjunta todas tus notas de voz (WhatsApp, grabaciones de celular o audios de Drive). El sistema las transcribe verbatim y evalúa las 8 dimensiones de la Guía IDM.
               </p>
             </div>
           </div>
@@ -746,7 +746,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
               2
             </div>
             <div>
-              <div className="text-xs font-black text-white">Transcripción & 9 Criterios</div>
+              <div className="text-xs font-black text-white">Transcripción & 8 Dimensiones</div>
               <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                 La IA transcribe cada diálogo verbatim y califica saludo, indagación, demostración, WhatsApp y cierre.
               </div>
@@ -1243,7 +1243,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
             </div>
           </div>
 
-          {/* 2. TABBED AUDIT WORKSPACE (Transcripción | 9 Criterios | Diagnóstico Comercial) */}
+          {/* 2. TABBED AUDIT WORKSPACE (Transcripción | 8 Dimensiones | Diagnóstico Comercial) */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             {/* Tab Header Navigation */}
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 pt-3">
@@ -1269,7 +1269,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                   }`}
                 >
                   <ListOrdered className="w-4 h-4 text-lime-600" />
-                  <span>Scorecard 9 Criterios ({dynamicTotalScore}/100)</span>
+                  <span>Scorecard 8 Dimensiones ({dynamicTotalScore}/100)</span>
                 </button>
 
                 <button
@@ -1408,10 +1408,10 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                   <div>
                     <h4 className="text-sm font-bold text-slate-900">
-                      Evaluación de los 9 Criterios Comerciales
+                      Evaluación de las 8 Dimensiones Comerciales
                     </h4>
                     <p className="text-xs text-slate-500">
-                      Escala estándar de 100 puntos con observaciones justificadas.
+                      Guía IDM · Escala de 100 puntos con observaciones justificadas.
                     </p>
                   </div>
 
@@ -1420,15 +1420,11 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                       {dynamicTotalScore}/100
                     </div>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        dynamicTotalScore >= 80
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : dynamicTotalScore >= 60
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getLevelBadgeClasses(
+                        getOverallLevel(dynamicTotalScore, localScores)
+                      )}`}
                     >
-                      {dynamicTotalScore >= 80 ? 'Bueno' : dynamicTotalScore >= 60 ? 'Regular' : 'Deficiente'}
+                      {getLevelDisplayName(getOverallLevel(dynamicTotalScore, localScores))}
                     </span>
                   </div>
                 </div>
@@ -1505,7 +1501,7 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
                         const updated: StoreEvaluation = {
                           ...currentEvaluation,
                           score: dynamicTotalScore,
-                          level: dynamicTotalScore >= 80 ? 'Bueno' : dynamicTotalScore >= 60 ? 'Regular' : 'Deficiente',
+                          level: getOverallLevel(dynamicTotalScore, localScores, currentEvaluation.flags),
                           criteriaBreakdown: localScores,
                           transcript: localTranscript,
                         };
@@ -1527,18 +1523,24 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
             {activeStudioTab === 'diagnostico' && (
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Cierre de venta */}
+                  {/* Estado de la venta */}
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                    <div className="text-xs font-bold text-slate-500">¿Hubo Intento de Cierre de Venta?</div>
+                    <div className="text-xs font-bold text-slate-500">Estado de la Venta</div>
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-sm font-black px-2.5 py-0.5 rounded-lg ${
-                          currentEvaluation?.saleClosed
+                          currentEvaluation?.saleStatus === 'CERRADA'
                             ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-rose-100 text-rose-800'
+                            : currentEvaluation?.saleStatus === 'ABANDONADA'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-slate-200 text-slate-700'
                         }`}
                       >
-                        {currentEvaluation?.saleClosed ? 'SÍ, SE INTENTÓ EL CIERRE' : 'NO, CIERRE PASIVO'}
+                        {currentEvaluation?.saleStatus === 'CERRADA'
+                          ? 'CERRADA'
+                          : currentEvaluation?.saleStatus === 'ABANDONADA'
+                          ? 'ABANDONADA POR EL ASESOR'
+                          : 'NO CERRADA (sin penalizar)'}
                       </span>
                     </div>
                   </div>

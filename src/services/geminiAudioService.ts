@@ -273,7 +273,7 @@ async function uploadAndTranscribeChunked(
     throw new Error(err.error || `Error del servidor al procesar audio (${processRes.status})`);
   }
 
-  onProgress?.('Estructurando los 9 criterios y consolidando informe...');
+  onProgress?.('Estructurando las 8 dimensiones y consolidando informe...');
 
   const resultJson = await processRes.json();
   if (!resultJson.success || !resultJson.data) {

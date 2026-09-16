@@ -141,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="bg-slate-950/80 px-4 py-1 text-[11px] text-slate-400 border-t border-slate-800/60 flex items-center justify-between">
         <div className="flex items-center gap-1 max-w-7xl mx-auto w-full">
           <ShieldCheck className="w-3.5 h-3.5 text-lime-400 shrink-0" />
-          <span className="truncate">Documento confidencial — Uso interno IVOO Retail | Metodología de 9 Criterios (100 Pts)</span>
+          <span className="truncate">Documento confidencial — Uso interno IVOO Retail | Metodología de 8 Dimensiones — Guía IDM (100 Pts)</span>
         </div>
       </div>
 
