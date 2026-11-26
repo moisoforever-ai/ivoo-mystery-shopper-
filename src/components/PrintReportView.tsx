@@ -67,6 +67,26 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
+        // html2canvas renders a CLONE of the page inside an iframe. In the production build the
+        // app's CSS is a <link rel="stylesheet">, which the clone may not have finished loading
+        // when rendering starts — producing a PDF with no styles at all (plain serif text).
+        // Inlining the compiled CSS as a <style> tag makes it apply synchronously.
+        onclone: (clonedDoc: Document) => {
+          let css = '';
+          for (const sheet of Array.from(document.styleSheets)) {
+            try {
+              css += Array.from(sheet.cssRules)
+                .map((r) => r.cssText)
+                .join('\n');
+            } catch {
+              // Cross-origin stylesheets (e.g. web fonts) can't be read — safe to skip.
+            }
+          }
+          clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((l) => l.remove());
+          const style = clonedDoc.createElement('style');
+          style.textContent = css;
+          clonedDoc.head.appendChild(style);
+        },
       });
 
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -118,6 +138,15 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           if (!isFirstPage) pdf.addPage();
           isFirstPage = false;
           renderPage(slice.top);
+
+          // The full-document image continues below this slice (into the NEXT block). Paint the
+          // unused rest of the page white so a short block never shows the next block's content
+          // underneath it (that's what caused the cover page to also show "Resumen Comparativo").
+          const usedMm = (slice.bottom - slice.top) / canvasPxPerMm;
+          if (usedMm < pdfHeight) {
+            pdf.setFillColor(255, 255, 255);
+            pdf.rect(0, usedMm, pdfWidth, pdfHeight - usedMm + 1, 'F');
+          }
         }
       }
 
