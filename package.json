@@ -16,7 +16,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "express": "^5.3.0",
     "firebase": "^12.17.1",
     "html2canvas-pro": "^2.4.1",
     "jspdf": "^4.2.1",
@@ -29,7 +29,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -41,5 +41,11 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7",
+    "source-map-js": "^1.2.4",
+    "re2js": "^2.10.0",
+    "dompurify": "^3.5.0"
   }
 }

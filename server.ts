@@ -13,6 +13,12 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 // Support large audio uploads (up to 50MB base64)
 app.use(express.json({ limit: "60mb" }));
 app.use(express.urlencoded({ extended: true, limit: "60mb" }));
+// Express 5 leaves req.body undefined when the request has no body; the handlers below
+// destructure it, so default it to an empty object (they then answer with a clear 400).
+app.use((req, _res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
 
 // Helper function to get Gemini client
 function getGeminiClient(): GoogleGenAI | null {
@@ -992,7 +998,8 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
+    // Express 5 (path-to-regexp v8) no longer accepts a bare "*" — use a named wildcard.
+    app.get("/{*splat}", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
