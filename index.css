@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+/* ============================================================
+   TEMA OSCURO "GAMING" (inspirado en el estilo visual de Razer)
+   Negro profundo + verde neón, esquinas angulares, tipografía
+   condensada en mayúsculas. Se aplica SOLO dentro de .theme-razer;
+   el informe PDF/impresión queda fuera para que siga siendo blanco.
+   ============================================================ */
+.theme-razer {
+  color-scheme: dark;
+  --neon: #44d62c;
+  --neon-soft: #6ee35a;
+  --ink: #f2f2f2;
+  font-family: 'Titillium Web', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background-color: #000;
+  background-image:
+    radial-gradient(1200px 420px at 50% -120px, rgba(68, 214, 44, 0.16), transparent 70%),
+    linear-gradient(180deg, #050505 0%, #000 100%);
+  color: var(--ink);
+  /* superficies y bordes de la escala slate -> oscuros */
+  --color-slate-50: #0d0d0d;
+  --color-slate-100: #141414;
+  --color-slate-200: #262626;
+  --color-slate-300: #343434;
+  --color-slate-400: #8a8a8a;
+  --color-slate-500: #a0a0a0;
+  --color-slate-600: #b6b6b6;
+  /* verde de marca */
+  --color-lime-300: #6ee35a;
+  --color-lime-400: #44d62c;
+  --color-lime-500: #3bc425;
+  --color-lime-600: #44d62c;
+  --color-emerald-50: #07150d;
+  --color-emerald-100: #0b2415;
+  --color-emerald-200: #14532d;
+  --color-emerald-300: #166534;
+  --color-rose-50: #1a0a0e;
+  --color-rose-100: #2a0f16;
+  --color-rose-200: #5b1426;
+  --color-rose-300: #7f1d32;
+  --color-amber-50: #1a1305;
+  --color-amber-100: #2a1e07;
+  --color-amber-200: #5b410a;
+  --color-amber-300: #78530c;
+  --color-blue-50: #071225;
+  --color-blue-100: #0b1d3d;
+  --color-blue-200: #173a73;
+  --color-blue-300: #1e4a94;
+  --color-sky-50: #06161f;
+  --color-sky-100: #0a2634;
+  --color-sky-200: #0c4a6e;
+  --color-sky-300: #0b5d8c;
+  --color-indigo-50: #0d0f28;
+  --color-indigo-100: #161a45;
+  --color-indigo-200: #2c3380;
+  --color-indigo-300: #3a42a3;
+  --color-purple-50: #150a26;
+  --color-purple-100: #220f40;
+  --color-purple-200: #46207a;
+  --color-purple-300: #5a2a9c;
+  --color-orange-50: #1b0e05;
+  --color-orange-100: #2c1707;
+  --color-orange-200: #6a3109;
+  --color-orange-300: #8a3f0c;
+  --color-lime-50: #0b1807;
+  --color-lime-100: #11260b;
+  --color-lime-200: #1f4d15;
+  --color-lime-300: #2b6b1d;
+}
+.theme-razer .text-slate-200 { color: #e2e2e2; }
+.theme-razer .hover\:text-slate-200:hover { color: #e2e2e2; }
+.theme-razer .group:hover .group-hover\:text-slate-200 { color: #e2e2e2; }
+.theme-razer .text-slate-300 { color: #cfcfcf; }
+.theme-razer .hover\:text-slate-300:hover { color: #cfcfcf; }
+.theme-razer .group:hover .group-hover\:text-slate-300 { color: #cfcfcf; }
+.theme-razer .text-slate-700 { color: #d4d4d4; }
+.theme-razer .hover\:text-slate-700:hover { color: #d4d4d4; }
+.theme-razer .group:hover .group-hover\:text-slate-700 { color: #d4d4d4; }
+.theme-razer .text-slate-800 { color: #e8e8e8; }
+.theme-razer .hover\:text-slate-800:hover { color: #e8e8e8; }
+.theme-razer .group:hover .group-hover\:text-slate-800 { color: #e8e8e8; }
+.theme-razer .text-slate-900 { color: #f5f5f5; }
+.theme-razer .hover\:text-slate-900:hover { color: #f5f5f5; }
+.theme-razer .group:hover .group-hover\:text-slate-900 { color: #f5f5f5; }
+.theme-razer .text-slate-950 { color: #000; }
+.theme-razer .hover\:text-slate-950:hover { color: #fff; }
+.theme-razer .text-slate-950.hover\:text-slate-950:hover { color: #000; }
+.theme-razer .text-emerald-700 { color: #6ee7b7; }
+.theme-razer .text-emerald-800 { color: #a7f3d0; }
+.theme-razer .text-emerald-900 { color: #d1fae5; }
+.theme-razer .text-emerald-950 { color: #ecfdf5; }
+.theme-razer .text-rose-700 { color: #fda4af; }
+.theme-razer .text-rose-800 { color: #fecdd3; }
+.theme-razer .text-rose-900 { color: #ffe4e6; }
+.theme-razer .text-rose-950 { color: #fff1f2; }
+.theme-razer .text-amber-700 { color: #fcd34d; }
+.theme-razer .text-amber-800 { color: #fde68a; }
+.theme-razer .text-amber-900 { color: #fef3c7; }
+.theme-razer .text-amber-950 { color: #fffbeb; }
+.theme-razer .text-blue-700 { color: #93c5fd; }
+.theme-razer .text-blue-800 { color: #bfdbfe; }
+.theme-razer .text-blue-900 { color: #dbeafe; }
+.theme-razer .text-blue-950 { color: #eff6ff; }
+.theme-razer .text-sky-700 { color: #7dd3fc; }
+.theme-razer .text-sky-800 { color: #bae6fd; }
+.theme-razer .text-sky-900 { color: #e0f2fe; }
+.theme-razer .text-sky-950 { color: #f0f9ff; }
+.theme-razer .text-indigo-700 { color: #a5b4fc; }
+.theme-razer .text-indigo-800 { color: #c7d2fe; }
+.theme-razer .text-indigo-900 { color: #e0e7ff; }
+.theme-razer .text-indigo-950 { color: #eef2ff; }
+.theme-razer .text-purple-700 { color: #d8b4fe; }
+.theme-razer .text-purple-800 { color: #e9d5ff; }
+.theme-razer .text-purple-900 { color: #f3e8ff; }
+.theme-razer .text-purple-950 { color: #faf5ff; }
+.theme-razer .text-orange-700 { color: #fdba74; }
+.theme-razer .text-orange-800 { color: #fed7aa; }
+.theme-razer .text-orange-900 { color: #ffedd5; }
+.theme-razer .text-orange-950 { color: #fff7ed; }
+.theme-razer .text-lime-700 { color: #8ff07d; }
+.theme-razer .text-lime-800 { color: #a6f293; }
+.theme-razer .text-lime-900 { color: #c8f5bf; }
+.theme-razer .text-lime-950 { color: #e8fbe4; }
+
+/* superficies blancas -> negro grafito */
+.theme-razer .bg-white { background-color: #0f0f0f; }
+.theme-razer .bg-white\/80, .theme-razer .bg-white\/60 { background-color: rgba(15,15,15,.8); }
+.theme-razer .hover\:bg-white:hover { background-color: #161616; }
+.theme-razer .hover\:bg-slate-50:hover, .theme-razer .hover\:bg-slate-100:hover { background-color: #171717; }
+.theme-razer .hover\:bg-slate-200:hover { background-color: #202020; }
+.theme-razer .text-white { color: #fff; }
+/* fondos oscuros con transparencia (overlays de modales) */
+.theme-razer .bg-slate-950\/70, .theme-razer .bg-slate-900\/80, .theme-razer .bg-slate-950\/80 {
+  background-color: rgba(0, 0, 0, 0.82);
+}
+.theme-razer .bg-slate-900 { background-color: #0a0a0a; }
+.theme-razer .bg-slate-950 { background-color: #000; }
+.theme-razer .bg-slate-800 { background-color: #1a1a1a; }
+.theme-razer .bg-slate-700 { background-color: #262626; }
+
+/* formularios */
+.theme-razer input, .theme-razer textarea, .theme-razer select {
+  background-color: #0b0b0b;
+  color: var(--ink);
+  border-color: #2e2e2e;
+}
+.theme-razer input::placeholder, .theme-razer textarea::placeholder { color: #6b6b6b; }
+.theme-razer input:focus, .theme-razer textarea:focus, .theme-razer select:focus {
+  outline: none;
+  border-color: var(--neon);
+  box-shadow: 0 0 0 1px var(--neon), 0 0 14px rgba(68, 214, 44, 0.25);
+}
+
+/* esquinas angulares (los círculos se respetan) */
+.theme-razer .rounded, .theme-razer .rounded-md, .theme-razer .rounded-lg,
+.theme-razer .rounded-xl, .theme-razer .rounded-2xl, .theme-razer .rounded-3xl {
+  border-radius: 3px;
+}
+
+/* tipografía */
+.theme-razer h1, .theme-razer h2, .theme-razer h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+.theme-razer button { letter-spacing: 0.02em; }
+.theme-razer .font-mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+/* botones principales con brillo neón */
+.theme-razer button.bg-lime-400, .theme-razer a.bg-lime-400 {
+  box-shadow: 0 0 0 rgba(68, 214, 44, 0);
+  transition: box-shadow .2s ease, background-color .2s ease, transform .15s ease;
+}
+.theme-razer button.bg-lime-400:hover:not(:disabled), .theme-razer a.bg-lime-400:hover {
+  box-shadow: 0 0 20px rgba(68, 214, 44, 0.45);
+}
+
+/* tarjetas: borde sutil que se enciende al pasar el cursor */
+.theme-razer .shadow-xs, .theme-razer .shadow-sm, .theme-razer .shadow-md,
+.theme-razer .shadow-lg, .theme-razer .shadow-xl, .theme-razer .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, .6);
+}
+.theme-razer .border-slate-200, .theme-razer .border-slate-100 { border-color: #232323; }
+
+/* cabecera: línea verde inferior estilo Razer */
+.theme-razer header.sticky { border-bottom: 1px solid var(--neon); box-shadow: 0 1px 24px rgba(68, 214, 44, 0.18); }
+
+/* barra de scroll oscura */
+.theme-razer ::selection { background: var(--neon); color: #000; }
+.theme-razer * { scrollbar-width: thin; scrollbar-color: #2e2e2e #0a0a0a; }
+
+/* hero superior */
+.hero-razer {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid #1c1c1c;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0) 0%, #000 100%),
+    repeating-linear-gradient(90deg, rgba(68,214,44,.05) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(0deg, rgba(68,214,44,.05) 0 1px, transparent 1px 64px),
+    radial-gradient(600px 220px at 50% 100%, rgba(68,214,44,.28), transparent 70%),
+    #030303;
+}
+.hero-razer::after {
+  content: '';
+  position: absolute; left: 50%; bottom: 0; width: min(720px, 80%); height: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, #44d62c, transparent);
+  box-shadow: 0 0 24px 2px rgba(68,214,44,.7);
+}
+

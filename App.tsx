@@ -1,0 +1,214 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { Header } from './components/Header';
+import { StoreEvaluation } from './types';
+import { loadEvaluations, saveEvaluationsSafely } from './services/storageManager';
+
+// Code-split the heavy views: each one is only downloaded when the user actually
+// navigates to it, instead of all four being bundled into the initial page load.
+// PrintReportView in particular pulls in jspdf + html2canvas, which are large
+// libraries most visits never need since the print modal is opened on demand.
+const AudioAuditorHub = lazy(() =>
+  import('./components/AudioAuditorHub').then((m) => ({ default: m.AudioAuditorHub }))
+);
+const ResumenComparativoView = lazy(() =>
+  import('./components/ResumenComparativoView').then((m) => ({ default: m.ResumenComparativoView }))
+);
+const EvaluacionesIndividualesView = lazy(() =>
+  import('./components/EvaluacionesIndividualesView').then((m) => ({ default: m.EvaluacionesIndividualesView }))
+);
+const PrintReportView = lazy(() =>
+  import('./components/PrintReportView').then((m) => ({ default: m.PrintReportView }))
+);
+
+function ViewLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<'audios' | 'resumen' | 'evaluaciones'>('audios');
+  const [evaluations, setEvaluations] = useState<StoreEvaluation[]>(() => {
+    return loadEvaluations();
+  });
+
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(evaluations[0]?.id || '');
+  const [isPrintOpen, setIsPrintOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    saveEvaluationsSafely(evaluations, 'Sincronización de estado');
+  }, [evaluations]);
+
+  const handleUpdateEvaluation = (updated: StoreEvaluation) => {
+    setEvaluations((prev) => {
+      const exists = prev.some((e) => e.id === updated.id);
+      const updatedList = exists
+        ? prev.map((item) => (item.id === updated.id ? updated : item))
+        : [updated, ...prev];
+      saveEvaluationsSafely(updatedList, `Actualización ${updated.storeName}`);
+      return updatedList;
+    });
+  };
+
+  const handleUpdateEvaluationsList = (newList: StoreEvaluation[]) => {
+    setEvaluations(newList);
+    saveEvaluationsSafely(newList, 'Actualización masiva de evaluaciones');
+  };
+
+  const handleDeleteEvaluation = (storeId: string) => {
+    setEvaluations((prev) => {
+      const filtered = prev.filter((e) => e.id !== storeId);
+      saveEvaluationsSafely(filtered, 'Eliminación de evaluación');
+      if (selectedStoreId === storeId && filtered.length > 0) {
+        setSelectedStoreId(filtered[0].id);
+      }
+      return filtered;
+    });
+  };
+
+  const handleGoToStore = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    setActiveTab('evaluaciones');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleGoToAudios = (storeId?: string) => {
+    if (storeId) setSelectedStoreId(storeId);
+    setActiveTab('audios');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleGoToResumen = () => {
+    setActiveTab('resumen');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const HERO: Record<typeof activeTab, { eyebrow: string; title: string; subtitle: string }> = {
+    audios: {
+      eyebrow: 'Centro de auditoría con IA',
+      title: 'Audios & Auto-Auditoría',
+      subtitle: 'Sube las grabaciones y evalúalas con la Guía IDM de 8 dimensiones.',
+    },
+    resumen: {
+      eyebrow: 'Benchmark retail',
+      title: 'Resumen Comparativo',
+      subtitle: 'Ranking de visitas, desempeño por dimensión y niveles de servicio.',
+    },
+    evaluaciones: {
+      eyebrow: 'Detalle por visita',
+      title: 'Fichas de Tienda',
+      subtitle: 'Puntuación, transcripción, observaciones del freelance y ediciones manuales.',
+    },
+  };
+
+  return (
+    <>
+    <div className="theme-razer min-h-screen text-slate-900 flex flex-col font-sans selection:bg-lime-400 selection:text-slate-950">
+      {/* Top Main Navigation Header */}
+      <Header
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onPrint={() => setIsPrintOpen(true)}
+        evaluations={evaluations}
+        onResetEvaluations={(resetEvals) => setEvaluations(resetEvals)}
+        selectedStoreId={selectedStoreId}
+        onSelectStore={(id) => setSelectedStoreId(id)}
+      />
+
+      {/* Hero banner (estilo gaming, cambia según la pestaña activa) */}
+      <section className="hero-razer">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 text-center">
+          <div className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.3em] text-lime-400">
+            {HERO[activeTab].eyebrow}
+          </div>
+          <h1 className="mt-2 text-3xl sm:text-5xl font-bold text-white tracking-tight drop-shadow-[0_0_18px_rgba(68,214,44,0.35)]">
+            {HERO[activeTab].title}
+          </h1>
+          <p className="mt-2 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">
+            {HERO[activeTab].subtitle}
+          </p>
+        </div>
+      </section>
+
+      {/* Main Content Area */}
+      <main className="flex-1 pb-16 pt-6">
+        {/* Tab 1: Primary Audio & AI Studio Hub.
+            IMPORTANT: this stays mounted at all times (only hidden via CSS when another tab
+            is active) instead of being conditionally rendered. Conditionally rendering it
+            (the old {activeTab === 'audios' && <AudioAuditorHub />} pattern) fully unmounted
+            the component on every tab switch, which could abandon an in-progress audit or
+            batch run and reset its local progress state when the user came back. It has its
+            own Suspense boundary so switching to the other tabs never affects it either. */}
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <div style={{ display: activeTab === 'audios' ? 'block' : 'none' }}>
+            <AudioAuditorHub
+              evaluations={evaluations}
+              selectedStoreId={selectedStoreId}
+              onSelectStore={(id) => setSelectedStoreId(id)}
+              onUpdateEvaluation={handleUpdateEvaluation}
+              onUpdateEvaluationsList={handleUpdateEvaluationsList}
+              onGoToConsolidated={handleGoToResumen}
+              onGoToFicha={handleGoToStore}
+            />
+          </div>
+        </Suspense>
+
+        <Suspense fallback={<ViewLoadingFallback />}>
+          {/* Tab 2: Comparative Summary & Benchmark */}
+          {activeTab === 'resumen' && (
+            <ResumenComparativoView
+              evaluations={evaluations}
+              onSelectStore={handleGoToStore}
+            />
+          )}
+
+          {/* Tab 3: Individual Store Mystery Shopper Scorecards */}
+          {activeTab === 'evaluaciones' && (
+            <EvaluacionesIndividualesView
+              evaluations={evaluations}
+              selectedStoreId={selectedStoreId}
+              onSelectStore={(id) => setSelectedStoreId(id)}
+              onUpdateEvaluation={handleUpdateEvaluation}
+              onDeleteEvaluation={handleDeleteEvaluation}
+              onGoToAudios={handleGoToAudios}
+            />
+          )}
+        </Suspense>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-mono font-black text-lime-400 bg-slate-800 px-2 py-0.5 rounded">
+              IVOO
+            </span>
+            <span>Auditoría de Calidad y Mystery Shopper • Julio 2026</span>
+          </div>
+          <div className="text-slate-500 text-center sm:text-right">
+            <span>Uso confidencial interno • Auditoría impulsada por Gemini 3.7 Flash</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    {/* Full Document Print & PDF Export Modal */}
+      {isPrintOpen && (
+        <Suspense fallback={null}>
+          <PrintReportView
+            evaluations={evaluations}
+            onClose={() => setIsPrintOpen(false)}
+          />
+        </Suspense>
+      )}
+
+    </>
+  );
+}
