@@ -90,8 +90,27 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const HERO: Record<typeof activeTab, { eyebrow: string; title: string; subtitle: string }> = {
+    audios: {
+      eyebrow: 'Centro de auditoría con IA',
+      title: 'Audios & Auto-Auditoría',
+      subtitle: 'Sube las grabaciones y evalúalas con la Guía IDM de 8 dimensiones.',
+    },
+    resumen: {
+      eyebrow: 'Benchmark retail',
+      title: 'Resumen Comparativo',
+      subtitle: 'Ranking de visitas, desempeño por dimensión y niveles de servicio.',
+    },
+    evaluaciones: {
+      eyebrow: 'Detalle por visita',
+      title: 'Fichas de Tienda',
+      subtitle: 'Puntuación, transcripción, observaciones del freelance y ediciones manuales.',
+    },
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-lime-400 selection:text-slate-950">
+    <>
+    <div className="theme-razer min-h-screen text-slate-900 flex flex-col font-sans selection:bg-lime-400 selection:text-slate-950">
       {/* Top Main Navigation Header */}
       <Header
         activeTab={activeTab}
@@ -103,8 +122,23 @@ export default function App() {
         onSelectStore={(id) => setSelectedStoreId(id)}
       />
 
+      {/* Hero banner (estilo gaming, cambia según la pestaña activa) */}
+      <section className="hero-razer">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 text-center">
+          <div className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.3em] text-lime-400">
+            {HERO[activeTab].eyebrow}
+          </div>
+          <h1 className="mt-2 text-3xl sm:text-5xl font-bold text-white tracking-tight drop-shadow-[0_0_18px_rgba(68,214,44,0.35)]">
+            {HERO[activeTab].title}
+          </h1>
+          <p className="mt-2 text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">
+            {HERO[activeTab].subtitle}
+          </p>
+        </div>
+      </section>
+
       {/* Main Content Area */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-16 pt-6">
         {/* Tab 1: Primary Audio & AI Studio Hub.
             IMPORTANT: this stays mounted at all times (only hidden via CSS when another tab
             is active) instead of being conditionally rendered. Conditionally rendering it
@@ -149,16 +183,6 @@ export default function App() {
         </Suspense>
       </main>
 
-      {/* Full Document Print & PDF Export Modal */}
-      {isPrintOpen && (
-        <Suspense fallback={null}>
-          <PrintReportView
-            evaluations={evaluations}
-            onClose={() => setIsPrintOpen(false)}
-          />
-        </Suspense>
-      )}
-
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -174,5 +198,17 @@ export default function App() {
         </div>
       </footer>
     </div>
+
+    {/* Full Document Print & PDF Export Modal */}
+      {isPrintOpen && (
+        <Suspense fallback={null}>
+          <PrintReportView
+            evaluations={evaluations}
+            onClose={() => setIsPrintOpen(false)}
+          />
+        </Suspense>
+      )}
+
+    </>
   );
 }
