@@ -195,7 +195,7 @@ async function uploadAndTranscribeChunked(
 ): Promise<AudioAuditResult> {
   const CHUNK_SIZE = 512 * 1024; // 512 KB per chunk (ensures payload is well below Nginx 1MB limits)
   const CHUNK_TIMEOUT_MS = 30 * 1000; // Each small chunk upload should be fast
-  const PROCESS_TIMEOUT_MS = 4 * 60 * 1000; // Gemini transcription + audit can legitimately take a while
+  const PROCESS_TIMEOUT_MS = 15 * 60 * 1000; // Gemini transcription + audit can legitimately take a while
   const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
   const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 
