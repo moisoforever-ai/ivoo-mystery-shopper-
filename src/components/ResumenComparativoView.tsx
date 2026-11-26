@@ -754,7 +754,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                     </td>
                   );
                 })}
-                <td className="py-3 px-3 text-center font-mono font-black text-sm text-slate-950 bg-slate-200">
+                <td className="py-3 px-3 text-center font-mono font-black text-sm text-lime-400 bg-slate-200">
                   {stats.overallAvg.toFixed(1)}
                 </td>
               </tr>

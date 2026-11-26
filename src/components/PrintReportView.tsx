@@ -41,6 +41,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
   const documentRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   /**
    * Method 1: DIRECT HIGH-RESOLUTION PDF GENERATION & DOWNLOAD
@@ -50,6 +51,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
     if (!documentRef.current) return;
     setIsGeneratingPDF(true);
     setDownloadSuccess(null);
+    setDownloadError(null);
 
     try {
       const element = documentRef.current;
@@ -124,8 +126,10 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
       setDownloadSuccess(`¡PDF generado y descargado con éxito! (${fileName})`);
     } catch (err) {
       console.error('Error generando PDF con canvas:', err);
-      // Fallback: trigger print window
-      handleOpenPrintWindow();
+      setDownloadError(
+        'No se pudo generar el PDF directamente. Prueba de nuevo o usa "Ventana de Impresión". Detalle: ' +
+          (err instanceof Error ? err.message : String(err))
+      );
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -150,21 +154,33 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
       return;
     }
 
+    // Reuse the app's own compiled CSS (Tailwind v4 build) so the print window looks identical.
+    // The old approach loaded the Tailwind CDN, which doesn't work with v4 classes / blocked networks.
+    const styleTags = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((el) => {
+        if (el.tagName === 'LINK') {
+          const href = (el as HTMLLinkElement).href;
+          return `<link rel="stylesheet" href="${href}">`;
+        }
+        return `<style>${el.textContent ?? ''}</style>`;
+      })
+      .join('\n');
+
     printWindow.document.open();
-    printWindow.document.write(`
-      <!DOCTYPE html>
+    printWindow.document.write(`<!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Informe Consolidado Mystery Shopper IVOO</title>
-          <script src="https://cdn.tailwindcss.com"></script>
+          <title>Informe Mystery Shopper</title>
+          ${styleTags}
           <style>
+            @page { margin: 0; size: A4; }
             @media print {
               body { padding: 0; margin: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .page-break-after { page-break-after: always; break-after: page; }
               .no-print { display: none !important; }
             }
-            body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 20px; }
+            body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #ffffff; padding: 20px; }
           </style>
         </head>
         <body class="bg-white text-slate-900">
@@ -176,7 +192,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               setTimeout(function() {
                 window.focus();
                 window.print();
-              }, 600);
+              }, 800);
             };
           </script>
         </body>
@@ -194,8 +210,33 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
   };
 
   const overallAvg = evaluations.reduce((sum, e) => sum + e.score, 0) / (evaluations.length || 1);
-  const contactCount = evaluations.filter((e) => e.contactCaptured).length;
-  const contactPercent = Math.round((contactCount / (evaluations.length || 1)) * 100);
+  const levelLabel = (score: number) =>
+    score >= 90 ? 'Asesor Smart' : score >= 80 ? 'Sólido' : score >= 65 ? 'En Desarrollo' : score >= 50 ? 'Insuficiente' : 'Crítico';
+
+  // Average % of max per dimension, computed from the real evaluations.
+  const dimensionStats = IVOO_CRITERIA.map((c) => {
+    const scores = evaluations.map(
+      (e) => e.criteriaBreakdown?.find((cb) => cb.criterionId === c.id)?.score ?? 0
+    );
+    const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    return { id: c.id, name: c.name, shortName: c.shortName, max: c.maxScore, avg, pct: c.maxScore ? avg / c.maxScore : 0 };
+  });
+  const rankedDims = [...dimensionStats].sort((a, b) => b.pct - a.pct);
+  const strongDims = rankedDims.slice(0, 3);
+  const weakDims = [...rankedDims].reverse().slice(0, 3);
+  const flaggedCount = evaluations.filter((e) => (e.flags?.length ?? 0) > 0).length;
+
+  const RECOMMENDATIONS: Record<string, string> = {
+    actitud: 'Reforzar la bienvenida proactiva y la disposición de servicio desde los primeros segundos de la interacción.',
+    necesidades: 'Profundizar el sondeo de necesidades (uso, presupuesto, preferencias) antes de presentar opciones.',
+    conocimiento: 'Reforzar el conocimiento de producto, garantías y condiciones comerciales con información exacta.',
+    propuesta: 'Traducir la necesidad detectada en una recomendación justificada, comparando alternativas.',
+    objeciones: 'Entrenar el manejo de objeciones de precio, competencia y stock con respuestas estructuradas.',
+    cierre: 'Incorporar preguntas de cierre y recuperación activa de la oportunidad cuando el cliente intenta retirarse.',
+    cross_up: 'Identificar oportunidades razonables de venta complementaria vinculadas a la necesidad real.',
+    experiencia: 'Cuidar la comunicación, la despedida y el seguimiento posterior a la visita.',
+  };
+
   const dates = Array.from(new Set(evaluations.map((e) => e.recordingDate).filter(Boolean)));
   const periodText = dates.some((d) => d.toLowerCase().includes('julio')) ? 'Julio de 2026' : dates[0] || 'Julio 2026';
   const cities = Array.from(new Set(evaluations.map((e) => e.city).filter(Boolean)));
@@ -220,7 +261,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
           {/* Primary Action Button: Guardar como PDF */}
           <button
             onClick={handleDownloadPDF}
-            disabled={isGeneratingPDF}
+            disabled={isGeneratingPDF || evaluations.length === 0}
             className="px-4 py-2.5 rounded-lg bg-lime-400 text-slate-950 font-black text-xs sm:text-sm hover:bg-lime-300 transition-all flex items-center gap-2 shadow-sm cursor-pointer hover:scale-102 disabled:opacity-50"
             title="Generar y descargar el archivo PDF directamente a tu equipo"
           >
@@ -265,10 +306,25 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
         </div>
       )}
 
+      {downloadError && (
+        <div className="max-w-5xl mx-auto mb-4 p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 font-bold flex items-center gap-2 print:hidden">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{downloadError}</span>
+        </div>
+      )}
+
+      {evaluations.length === 0 && (
+        <div className="max-w-5xl mx-auto mb-4 p-6 bg-white rounded-xl text-center text-sm text-slate-700 print:hidden">
+          <p className="font-bold text-slate-900 mb-1">No hay evaluaciones para generar el informe.</p>
+          <p>Audita al menos un audio en la pestaña "Audios" y vuelve a abrir esta vista.</p>
+        </div>
+      )}
+
       {/* Main Print Document Container */}
       <div
         ref={documentRef}
         id="printable-report-document"
+        hidden={evaluations.length === 0}
         className="max-w-5xl mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-12 print:p-0 print:shadow-none print:rounded-none space-y-12 print:space-y-8 text-slate-900 text-sm"
       >
         
@@ -312,12 +368,12 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
             <div>
               <div className="text-xs text-slate-500 uppercase font-semibold">Promedio General</div>
               <div className="text-2xl font-black text-slate-900 mt-0.5">{overallAvg.toFixed(1)} / 100</div>
-              <div className="text-[11px] text-amber-800 font-bold">Nivel {overallAvg >= 90 ? 'Asesor Smart' : overallAvg >= 80 ? 'Sólido' : overallAvg >= 65 ? 'En Desarrollo' : overallAvg >= 50 ? 'Insuficiente' : 'Crítico'}</div>
+              <div className="text-[11px] text-amber-800 font-bold">Nivel {levelLabel(overallAvg)}</div>
             </div>
             <div>
-              <div className="text-xs text-slate-500 uppercase font-semibold">Captura de Contacto</div>
-              <div className="text-2xl font-black text-slate-900 mt-0.5">{contactPercent}% ({contactCount} / {evaluations.length})</div>
-              <div className="text-[11px] text-slate-600 font-bold">{contactCount === 0 ? 'Sin registros' : `${contactCount} clientes`}</div>
+              <div className="text-xs text-slate-500 uppercase font-semibold">Visitas Evaluadas</div>
+              <div className="text-2xl font-black text-slate-900 mt-0.5">{evaluations.length}</div>
+              <div className="text-[11px] text-slate-600 font-bold">{flaggedCount} con banderas de fallo</div>
             </div>
           </div>
 
@@ -344,8 +400,7 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
               Resumen Comparativo
             </h2>
             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              Durante el período de {periodText} se completaron {evaluations.length} visitas de evaluación Mystery Shopper en tiendas {brandsText} ubicadas en las plazas de {cities.join(', ')}. La auditoría registró una puntuación media global de <strong>{overallAvg.toFixed(1)}/100</strong>, con una <strong>captura de datos de contacto del {contactPercent}%</strong> ({contactCount} de {evaluations.length} visitas), reflejando oportunidades clave en prospección comercial.
-            </p>
+              Durante el período de {periodText} se completaron {evaluations.length} visitas de evaluación Mystery Shopper en tiendas {brandsText} ubicadas en {cities.join(', ')}. La auditoría registró una puntuación media global de <strong>{overallAvg.toFixed(1)}/100</strong> (nivel {levelLabel(overallAvg)}){flaggedCount > 0 ? `, con ${flaggedCount} visita(s) con banderas de fallo` : ''}.</p>
           </div>
 
           {/* Ranking Table */}
@@ -415,39 +470,42 @@ export const PrintReportView: React.FC<PrintReportViewProps> = ({
             </div>
           </div>
 
-          {/* Transversal findings */}
-          <div data-pdf-atom className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="border border-rose-200 bg-rose-50/50 p-3 rounded">
-              <h4 className="font-bold text-rose-900 mb-2">Patrones Críticos y Oportunidades:</h4>
-              <ul className="space-y-1 text-slate-700 list-disc list-inside leading-tight">
-                <li>Captura de datos de contacto efectuada en {contactCount} de {evaluations.length} interacciones ({contactPercent}%).</li>
-                <li>Sondeo de necesidades enfocado primariamente al rango de precio.</li>
-                <li>Brecha de rendimiento entre la tienda superior ({topEval?.storeName} - {topEval?.score} pts) y la inferior ({bottomEval?.storeName} - {bottomEval?.score} pts).</li>
-              </ul>
-            </div>
+          {/* Transversal findings (derived from the real evaluations) */}
+          {evaluations.length > 0 && (
+            <>
+              <div data-pdf-atom className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="border border-rose-200 bg-rose-50/50 p-3 rounded">
+                  <h4 className="font-bold text-rose-900 mb-2">Dimensiones con Mayor Oportunidad:</h4>
+                  <ul className="space-y-1 text-slate-700 list-disc list-inside leading-tight">
+                    {weakDims.map((d) => (
+                      <li key={d.id}>{d.name}: promedio {d.avg.toFixed(1)}/{d.max} ({Math.round(d.pct * 100)}%).</li>
+                    ))}
+                    {topEval && bottomEval && evaluations.length > 1 && (
+                      <li>Brecha entre la tienda superior ({topEval.storeName} — {topEval.score} pts) y la inferior ({bottomEval.storeName} — {bottomEval.score} pts).</li>
+                    )}
+                  </ul>
+                </div>
 
-            <div className="border border-emerald-200 bg-emerald-50/50 p-3 rounded">
-              <h4 className="font-bold text-emerald-900 mb-2">Fortalezas Destacadas:</h4>
-              <ul className="space-y-1 text-slate-700 list-disc list-inside leading-tight">
-                <li>Buen trato, actitud y recepción general en el piso de venta.</li>
-                <li>Dominio en especificaciones de producto y sistemas inteligentes (Google TV / 4K).</li>
-                <li>Claridad en explicación de precios de contado, métodos de pago y financiamiento.</li>
-                <li>Piso de venta con pantallas encendidas y precios señalizados.</li>
-              </ul>
-            </div>
-          </div>
+                <div className="border border-emerald-200 bg-emerald-50/50 p-3 rounded">
+                  <h4 className="font-bold text-emerald-900 mb-2">Dimensiones más Fuertes:</h4>
+                  <ul className="space-y-1 text-slate-700 list-disc list-inside leading-tight">
+                    {strongDims.map((d) => (
+                      <li key={d.id}>{d.name}: promedio {d.avg.toFixed(1)}/{d.max} ({Math.round(d.pct * 100)}%).</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
 
-          {/* Priority recommendations */}
-          <div data-pdf-atom className="border border-slate-300 bg-slate-50 p-3 rounded text-xs">
-            <h4 className="font-bold text-slate-900 mb-1.5">Recomendaciones Estratégicas para la Dirección Comercial:</h4>
-            <ol className="list-decimal list-inside space-y-1 text-slate-700">
-              <li>Implementar protocolo de cierre directo obligatorio mediante alternativas de facturación inmediata o reserva.</li>
-              <li>Establecer como estándar la captura del número de WhatsApp del cliente para cotizaciones y seguimiento post-visita.</li>
-              <li>Estandarizar el saludo de bienvenida proactivo en los primeros 10 segundos de ingreso a tienda.</li>
-              <li>Profundizar el sondeo de necesidades mediante preguntas consultivas antes de presentar opciones de compra.</li>
-              <li>Incentivar activamente la venta cruzada sistemática de accesorios (protectores de voltaje, soportes, cables).</li>
-            </ol>
-          </div>
+              <div data-pdf-atom className="border border-slate-300 bg-slate-50 p-3 rounded text-xs">
+                <h4 className="font-bold text-slate-900 mb-1.5">Recomendaciones para la Dirección Comercial:</h4>
+                <ol className="list-decimal list-inside space-y-1 text-slate-700">
+                  {weakDims.map((d) => (
+                    <li key={d.id}>{RECOMMENDATIONS[d.id]}</li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ================= EVALUACIONES INDIVIDUALES ================= */}
