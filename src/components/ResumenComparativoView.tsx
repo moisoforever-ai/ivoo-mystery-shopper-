@@ -34,6 +34,17 @@ interface ResumenComparativoViewProps {
   onSelectStore: (storeId: string) => void;
 }
 
+const DIMENSION_RECOMMENDATIONS: Record<string, string> = {
+  actitud: 'Reforzar la bienvenida proactiva, la energía y la disposición de servicio desde los primeros segundos de la interacción.',
+  necesidades: 'Profundizar el sondeo (uso, presupuesto, preferencias) con preguntas abiertas antes de presentar opciones.',
+  conocimiento: 'Reforzar el conocimiento de producto, garantías, financiamiento y condiciones comerciales con información exacta.',
+  propuesta: 'Traducir la necesidad detectada en una recomendación justificada, comparando alternativas concretas.',
+  objeciones: 'Entrenar el manejo de objeciones de precio, competencia y stock con respuestas estructuradas.',
+  cierre: 'Incorporar preguntas de cierre, reserva o búsqueda de inventario, y recuperar activamente al cliente que intenta retirarse.',
+  cross_up: 'Identificar oportunidades razonables de venta complementaria o de mejora, vinculadas a la necesidad real del cliente.',
+  experiencia: 'Cuidar la comunicación, la despedida y el seguimiento posterior a la visita.',
+};
+
 export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
   evaluations = EVALUATIONS_DATA,
   onSelectStore,
@@ -77,11 +88,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
     const total = filteredEvaluations.length || 1;
     const overallAvg = filteredEvaluations.reduce((sum, e) => sum + (Number(e.score) || 0), 0) / total;
 
-    const closedCount = filteredEvaluations.filter((e) => e.saleClosed).length;
-    const closedPercentage = (closedCount / total) * 100;
-
-    const contactCount = filteredEvaluations.filter((e) => e.contactCaptured).length;
-    const contactPercentage = (contactCount / total) * 100;
+    const flaggedCount = filteredEvaluations.filter((e) => (e.flags?.length ?? 0) > 0).length;
 
     const smartCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'SMART').length;
     const solidoCount = filteredEvaluations.filter((e) => getOverallLevel(e.score, e.criteriaBreakdown, e.flags) === 'SOLIDO').length;
@@ -143,10 +150,7 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
       total,
       overallAvg,
       level,
-      closedCount,
-      closedPercentage,
-      contactCount,
-      contactPercentage,
+      flaggedCount,
       smartCount,
       solidoCount,
       enDesarrolloCount,
@@ -339,7 +343,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                 <th className="py-3 px-3 text-center bg-lime-50 text-lime-900">Promedio IVOO</th>
                 <th className="py-3 px-3 text-center bg-blue-50 text-blue-900">Promedio Competencia</th>
                 <th className="py-3 px-3 text-center">Brecha (Delta)</th>
-                <th className="py-3 px-3 text-center">Tasa Cierre</th>
                 <th className="py-3 px-4 text-right">Acción</th>
               </tr>
             </thead>
@@ -388,9 +391,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
-                    </td>
-                    <td className="py-3 px-3 text-center font-mono">
-                      {m.closedRateIvoo.toFixed(0)}% IVOO / {m.closedRateCompetencia.toFixed(0)}% Comp
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button
@@ -531,13 +531,13 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs uppercase font-semibold text-slate-500">Captura de Contacto</span>
+          <span className="text-xs uppercase font-semibold text-slate-500">Visitas Evaluadas</span>
           <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-3xl font-black text-slate-900">{stats.contactPercentage.toFixed(1)}%</span>
-            <span className="text-xs text-slate-400 font-semibold">({stats.contactCount} / {stats.total})</span>
+            <span className="text-3xl font-black text-slate-900">{filteredEvaluations.length}</span>
+            <span className="text-xs text-slate-400 font-semibold">visita(s)</span>
           </div>
           <span className="inline-block mt-2 text-xs font-medium text-slate-600">
-            {stats.contactCount} contacto(s) registrado(s)
+            {stats.flaggedCount} con banderas de fallo
           </span>
         </div>
 
@@ -763,9 +763,8 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
         </div>
       </div>
 
-      {/* 7. Transversal Findings */}
+      {/* 7. Transversal Findings (todo se calcula con las evaluaciones reales) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Patrones Comunes Negativos */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-200">
           <div className="flex items-center gap-2 text-rose-700 font-bold text-base mb-4">
             <XCircle className="w-5 h-5 shrink-0" />
@@ -775,13 +774,13 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Pérdida de captación de clientes ({stats.contactPercentage.toFixed(0)}% de efectividad):</strong> Solo se registraron datos en {stats.contactCount} de las {stats.total} interacciones, desaprovechando la oportunidad de enviar cotizaciones formales por WhatsApp.
+                <strong>Dimensiones de menor desempeño:</strong> {stats.weakestCriteria.map((c) => `${c.name} (${c.percentage.toFixed(0)}%)`).join(', ')}.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Criterios de menor desempeño:</strong> {stats.weakestCriteria.map((c) => `${c.name} (${c.percentage.toFixed(0)}%)`).join(', ')}, señalando la urgencia de fortalecer la detección de necesidades y la proactividad en el piso de venta.
+                <strong>Banderas de fallo:</strong> {stats.flaggedCount} de {filteredEvaluations.length} visita(s) activaron al menos una bandera (F1–F5) que limita el nivel máximo alcanzable.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
@@ -793,7 +792,6 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
           </ul>
         </div>
 
-        {/* Fortalezas Destacadas */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-200">
           <div className="flex items-center gap-2 text-emerald-800 font-bold text-base mb-4">
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
@@ -803,32 +801,26 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Criterios con mejor valoración:</strong> {stats.strongestCriteria.map((c) => `${c.name} (${c.percentage.toFixed(0)}%)`).join(', ')}, demostrando buena actitud general y dominio en características de producto y formas de pago.
+                <strong>Dimensiones con mejor valoración:</strong> {stats.strongestCriteria.map((c) => `${c.name} (${c.percentage.toFixed(0)}%)`).join(', ')}.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Dominio en medios de pago y financiamiento:</strong> Claridad en el desglose de precios en divisas, bolívares a tasa oficial y opciones de financiamiento y crédito en piso de venta.
+                <strong>Visitas de nivel alto:</strong> {stats.smartCount + stats.solidoCount} de {filteredEvaluations.length} visita(s) alcanzaron nivel Sólido o Asesor Smart.
               </div>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
               <div>
-                <strong>Exhibición y ambientación tecnológica:</strong> Equipos de pantallas y tecnología encendidos y exhibidos adecuadamente para permitir la comparación visual directa.
-              </div>
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5"></span>
-              <div>
-                <strong>Tiendas de referencia:</strong> Sucursales como {stats.topEvaluation?.storeName} ({stats.topEvaluation?.score} pts) demuestran que la aplicación consistente del protocolo eleva el nivel de satisfacción comercial.
+                <strong>Tienda de referencia:</strong> {stats.topEvaluation?.storeName} ({stats.topEvaluation?.score} pts) es la visita con mejor puntuación y sirve de modelo a replicar.
               </div>
             </li>
           </ul>
         </div>
       </div>
 
-      {/* 8. Strategic Recommendations */}
+      {/* 8. Strategic Recommendations (derivadas de las dimensiones más débiles) */}
       <div className="bg-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-md border border-slate-800">
         <div className="flex items-center gap-2 text-lime-400 font-mono text-xs uppercase font-bold tracking-widest mb-2">
           <Lightbulb className="w-4 h-4" />
@@ -838,49 +830,22 @@ export const ResumenComparativoView: React.FC<ResumenComparativoViewProps> = ({
           Recomendaciones Prioritarias para la Dirección Comercial
         </h3>
         <p className="text-slate-400 text-xs sm:text-sm mt-1 mb-6">
-          Ejes de intervención comercial inmediata aplicables a la red de tiendas en {stats.citiesText}
+          Ejes de intervención según las dimensiones con menor puntaje{stats.citiesText ? ` en ${stats.citiesText}` : ''}
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs sm:text-sm">
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
-              <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">1</span>
-              <span>Implementar protocolo obligatorio de cierre de venta</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              Entrenar a la fuerza de ventas en preguntas de transición y cierre por alternativa ("¿Preparamos la factura para entrega inmediata o reservamos el modelo?") ante cualquier señal de interés del comprador.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
-              <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">2</span>
-              <span>Captura sistemática de número telefónico (WhatsApp)</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              Establecer como KPI que todo asesor solicite el teléfono del cliente para enviar cotización digital, ficha técnica o notificar ofertas, asegurando el seguimiento post-visita.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
-              <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">3</span>
-              <span>Estandarizar el protocolo de saludo y bienvenida en 10 segundos</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              Exigir contacto visual inmediato, sonrisa, presentación con nombre del asesor y bienvenida proactiva en puerta, erradicando los tiempos muertos de espera.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
-            <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
-              <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">4</span>
-              <span>Profundizar el sondeo de necesidades y venta consultiva</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              Capacitar en preguntas abiertas sobre dimensiones, usos específicos y preferencias antes de ofrecer opciones, evitando limitarse únicamente al rango de precio inicial.
-            </p>
-          </div>
+          {[...stats.criteriaAverages]
+            .sort((a, b) => a.percentage - b.percentage)
+            .slice(0, 4)
+            .map((c, idx) => (
+              <div key={c.id} className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/80">
+                <div className="flex items-center gap-2 text-lime-400 font-bold mb-1.5">
+                  <span className="bg-lime-400/20 text-lime-400 font-mono px-2 py-0.5 rounded text-xs">{idx + 1}</span>
+                  <span>{c.name} ({c.percentage.toFixed(0)}%)</span>
+                </div>
+                <p className="text-slate-300 leading-relaxed">{DIMENSION_RECOMMENDATIONS[c.id] ?? c.description}</p>
+              </div>
+            ))}
         </div>
       </div>
     </div>
