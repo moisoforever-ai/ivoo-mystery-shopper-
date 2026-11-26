@@ -488,8 +488,9 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
   };
 
   // Run batch audit on all ready files
-  const handleBatchAuditAll = async () => {
-    const pendingItems = loadedAudios.filter((a) => a.status === 'ready');
+  const handleBatchAuditAll = () => runBatchAudit(loadedAudios.filter((a) => a.status === 'ready'));
+
+  const runBatchAudit = async (pendingItems: LoadedAudioItem[]) => {
     if (pendingItems.length === 0) return;
 
     setBatchWarningMsg(null);
@@ -645,12 +646,23 @@ export const AudioAuditorHub: React.FC<AudioAuditorHubProps> = ({
   const auditedCount = loadedAudios.filter((a) => a.status === 'audited').length;
   const erroredCount = loadedAudios.filter((a) => a.status === 'error').length;
 
-  // Requeue every failed item (e.g. ones that hit Gemini's quota) back to "ready" so the next
-  // "Auditar Todo" click picks them up automatically — no need to retry one by one.
+  // Retry every failed item that still has its audio file: they go back to "ready" and the batch
+  // starts again right away (no second click on "Auditar" needed). Items without a file stay as
+  // errors because there is nothing to send — the user has to attach the audio first.
   const handleRetryFailed = () => {
+    if (batchProgress) return; // a batch is already running
+    const retryable = loadedAudios.filter((a) => a.status === 'error' && a.file);
+    if (retryable.length === 0) return;
+    const retryIds = new Set(retryable.map((a) => a.id));
     setLoadedAudios((prev) =>
-      prev.map((a) => (a.status === 'error' ? { ...a, status: 'ready', error: undefined } : a))
+      prev.map((a) => (retryIds.has(a.id) ? { ...a, status: 'ready', error: undefined } : a))
     );
+    // Also include audios that were already pending, so one click processes the whole queue.
+    const alreadyReady = loadedAudios.filter((a) => a.status === 'ready');
+    void runBatchAudit([
+      ...retryable.map((a) => ({ ...a, status: 'ready' as const, error: undefined })),
+      ...alreadyReady,
+    ]);
   };
 
   return (
