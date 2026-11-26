@@ -11,7 +11,17 @@
   --neon: #44d62c;
   --neon-soft: #6ee35a;
   --ink: #f2f2f2;
-  font-family: 'Titillium Web', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* texto de lectura: Inter (muy legible a tamaños chicos); títulos y botones: Titillium Web */
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Titillium Web', 'Inter', system-ui, sans-serif;
+  font-family: var(--font-body);
+  /* escala tipográfica más grande para que todo se lea bien */
+  --text-xs: 0.8125rem;   /* 13px */
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;   /* 15px */
+  --text-sm--line-height: 1.45rem;
+  --text-base: 1.0625rem; /* 17px */
+  --text-base--line-height: 1.6rem;
   background-color: #000;
   background-image:
     radial-gradient(1200px 420px at 50% -120px, rgba(68, 214, 44, 0.16), transparent 70%),
@@ -22,9 +32,9 @@
   --color-slate-100: #141414;
   --color-slate-200: #262626;
   --color-slate-300: #343434;
-  --color-slate-400: #8a8a8a;
-  --color-slate-500: #a0a0a0;
-  --color-slate-600: #b6b6b6;
+  --color-slate-400: #a8a8a8;
+  --color-slate-500: #b8b8b8;
+  --color-slate-600: #cdcdcd;
   /* verde de marca */
   --color-lime-300: #6ee35a;
   --color-lime-400: #44d62c;
@@ -209,3 +219,17 @@
   box-shadow: 0 0 24px 2px rgba(68,214,44,.7);
 }
 
+
+/* ---------- LEGIBILIDAD ---------- */
+/* tamaños mínimos: nada por debajo de 12px */
+.theme-razer .text-\[8px\],
+.theme-razer .text-\[9px\],
+.theme-razer .text-\[10px\] { font-size: 12px; line-height: 1.3; }
+.theme-razer .text-\[11px\] { font-size: 12.5px; line-height: 1.35; }
+/* pesos y espaciado: el 900 se ve borroso en fuentes pequeñas */
+.theme-razer .font-black, .theme-razer .font-extrabold { font-weight: 700; }
+.theme-razer .tracking-tight, .theme-razer .tracking-tighter { letter-spacing: 0; }
+.theme-razer .tracking-widest, .theme-razer .tracking-wider { letter-spacing: 0.08em; }
+/* Titillium solo para títulos, botones y navegación */
+.theme-razer h1, .theme-razer h2, .theme-razer h3, .theme-razer h4,
+.theme-razer button, .theme-razer nav { font-family: var(--font-display); }
