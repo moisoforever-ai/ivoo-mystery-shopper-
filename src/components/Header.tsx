@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Radio className="w-4 h-4" />
               <span>Audios & IA</span>
-              <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${
+              <span className={`hidden 2xl:inline text-[9px] font-mono px-1.5 py-0.2 rounded font-black ${
                 activeTab === 'audios' ? 'bg-slate-950 text-lime-400' : 'bg-lime-400/20 text-lime-300'
               }`}>
                 Auto-Auditoría
